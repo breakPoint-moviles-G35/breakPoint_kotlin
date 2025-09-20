@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -121,9 +122,17 @@ fun BreakPointApp() {
                     }
                 )
             }
-            composable(Destinations.Explore.route) { ExploreScreen() }
-            composable(Destinations.Rate.route) { RateScreen() }
+            composable(Destinations.Explore.route) { ExploreScreen(navController) }
+            composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
             composable(Destinations.Reservations.route) { ReservationsScreen() }
+            composable(Destinations.DetailedSpace.route) { backStackEntry ->
+                val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
+                DetailedSpaceScreen(spaceId = spaceId, navController = navController)
+            }
+            composable(Destinations.ReserveRoom.route) { backStackEntry ->
+                val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
+                ReserveRoomScreen(spaceId = spaceId, navController = navController)
+            }
         }
     }
 }
@@ -133,6 +142,12 @@ sealed class Destinations(val route: String, val label: String) {
     data object Explore : Destinations("explore", "Explore")
     data object Rate : Destinations("rate", "Rate")
     data object Reservations : Destinations("reservations", "Reservations")
+    data object DetailedSpace : Destinations("detailed_space/{spaceId}", "Space Details") {
+        fun createRoute(spaceId: String) = "detailed_space/$spaceId"
+    }
+    data object ReserveRoom : Destinations("reserve_room/{spaceId}", "Reserve Room") {
+        fun createRoute(spaceId: String) = "reserve_room/$spaceId"
+    }
 }
 
 @Composable
@@ -163,10 +178,12 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 ),
                 icon = {
                     val icon = when (destination) {
-                        Destinations.Login -> Icons.Default.Star
                         Destinations.Explore -> Icons.Default.Search
-                        Destinations.Rate -> Icons.Default.Star
-                        Destinations.Reservations -> Icons.Default.Star
+                        Destinations.Rate,
+                        Destinations.Reservations,
+                        Destinations.DetailedSpace,
+                        Destinations.ReserveRoom,
+                        Destinations.Login -> Icons.Default.Star
                     }
                     Icon(imageVector = icon, contentDescription = destination.label)
                 },
@@ -271,7 +288,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExploreScreen() {
+fun ExploreScreen(navController: NavHostController) {
     var query by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -324,7 +341,9 @@ fun ExploreScreen() {
                 .padding(horizontal = 16.dp)
         ) {
             items(items) { space ->
-                SpaceCard(space)
+                SpaceCard(space = space, onClick = {
+                    navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                })
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -361,20 +380,14 @@ fun ExploreScreen() {
     }
 }
 
-data class SpaceItem(
-    val title: String,
-    val address: String,
-    val hour: String,
-    val rating: Double,
-    val price: Int
-)
-
 @Composable
-fun SpaceCard(space: SpaceItem) {
+fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Box(
             modifier = Modifier
@@ -416,9 +429,9 @@ fun SpaceCard(space: SpaceItem) {
 }
 
 private fun demoSpaces(): List<SpaceItem> = listOf(
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
+    SpaceItem("1", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("2", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("3", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
 )
 
 @Composable
@@ -492,13 +505,6 @@ fun ReservationsScreen() {
         }
     }
 }
-
-data class ReservationItem(
-    val title: String,
-    val hour: String,
-    val address: String,
-    val rating: Double
-)
 
 @Composable
 fun ReservationCard(reservation: ReservationItem) {
