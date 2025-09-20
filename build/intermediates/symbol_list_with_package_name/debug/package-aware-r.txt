@@ -186,6 +186,8 @@ layout notification_template_icon_group
 layout notification_template_part_chronometer
 layout notification_template_part_time
 mipmap ic_launcher
+string action_apply
+string action_cancel
 string androidx_startup
 string app_name
 string call_notification_answer_action
@@ -202,6 +204,12 @@ string default_popup_window_title
 string dropdown_menu
 string in_progress
 string indeterminate
+string login_button
+string login_password_label
+string login_password_placeholder
+string login_title
+string login_username_label
+string login_username_placeholder
 string m3c_bottom_sheet_collapse_description
 string m3c_bottom_sheet_dismiss_description
 string m3c_bottom_sheet_drag_handle_description

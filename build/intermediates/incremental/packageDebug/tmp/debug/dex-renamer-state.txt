@@ -1,4 +1,4 @@
-#Sat Sep 20 00:32:57 COT 2025
+#Sat Sep 20 02:20:49 COT 2025
 base.0=C\:\\Users\\JUANITA\\OneDrive - Universidad de los Andes\\Documentos\\UNIVERSIDAD\\2025-02\\Moviles\\Repositories\\breakPoint_kotlin\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
 base.1=C\:\\Users\\JUANITA\\OneDrive - Universidad de los Andes\\Documentos\\UNIVERSIDAD\\2025-02\\Moviles\\Repositories\\breakPoint_kotlin\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
 base.2=C\:\\Users\\JUANITA\\OneDrive - Universidad de los Andes\\Documentos\\UNIVERSIDAD\\2025-02\\Moviles\\Repositories\\breakPoint_kotlin\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\13\\classes.dex
