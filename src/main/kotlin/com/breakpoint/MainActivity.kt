@@ -176,6 +176,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.Explore -> Icons.Default.Search
                         Destinations.Rate -> Icons.Default.Star
                         Destinations.Reservations -> Icons.Default.Star
+                        Destinations.ReserveRoom -> Icons.Default.Star
                     }
                     Icon(imageVector = icon, contentDescription = destination.label)
                 },
@@ -333,7 +334,9 @@ fun ExploreScreen() {
                 .padding(horizontal = 16.dp)
         ) {
             items(items) { space ->
-                SpaceCard(space)
+                SpaceCard(space = space, onClick = {
+                    navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                })
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -370,20 +373,14 @@ fun ExploreScreen() {
     }
 }
 
-data class SpaceItem(
-    val title: String,
-    val address: String,
-    val hour: String,
-    val rating: Double,
-    val price: Int
-)
-
 @Composable
-fun SpaceCard(space: SpaceItem) {
+fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Box(
             modifier = Modifier
@@ -501,13 +498,6 @@ fun ReservationsScreen() {
         }
     }
 }
-
-data class ReservationItem(
-    val title: String,
-    val hour: String,
-    val address: String,
-    val rating: Double
-)
 
 @Composable
 fun ReservationCard(reservation: ReservationItem) {

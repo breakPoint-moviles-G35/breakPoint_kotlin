@@ -137,6 +137,13 @@ fun BreakPointApp() {
     }
 }
 
+sealed class Destinations(val route: String, val label: String) {
+    data object Login : Destinations("login", "Login")
+    data object Explore : Destinations("explore", "Explore")
+    data object Rate : Destinations("rate", "Rate")
+    data object Reservations : Destinations("reservations", "Reservations")
+}
+
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations)
@@ -181,8 +188,103 @@ private fun BottomNavigationBar(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun LoginScreen(onLoginSuccess: () -> Unit) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = stringResource(id = R.string.login_title),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(text = stringResource(id = R.string.login_username_label))
+        Spacer(modifier = Modifier.height(6.dp))
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            shadowElevation = 8.dp,
+            tonalElevation = 0.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            TextField(
+                value = username,
+                onValueChange = { username = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(id = R.string.login_username_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                shape = MaterialTheme.shapes.extraLarge
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(text = stringResource(id = R.string.login_password_label))
+        Spacer(modifier = Modifier.height(6.dp))
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            shadowElevation = 8.dp,
+            tonalElevation = 0.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(id = R.string.login_password_placeholder)) },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                shape = MaterialTheme.shapes.extraLarge
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = onLoginSuccess,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = MaterialTheme.shapes.extraLarge
+        ) {
+            Text(text = stringResource(id = R.string.login_button), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun ExploreScreen(navController: NavHostController) {
     var query by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -238,10 +340,39 @@ fun ExploreScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+
+        if (showDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    Button(
+                        onClick = { showDatePicker = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(text = stringResource(id = R.string.action_apply))
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showDatePicker = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        )
+                    ) {
+                        Text(text = stringResource(id = R.string.action_cancel))
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
     }
 }
-
-
+    
 @Composable
 fun SpaceCard(space: SpaceItem, onClick: () -> Unit = {}) {
     Card(
@@ -305,6 +436,11 @@ private fun SimpleCenter(text: String) {
 }
 
 @Composable
+private fun RateScreen() {
+    SimpleCenter(text = "Rate")
+}
+
+@Composable
 fun ReservationsScreen() {
     var query by remember { mutableStateOf("") }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -362,7 +498,6 @@ fun ReservationsScreen() {
         }
     }
 }
-
 
 @Composable
 fun ReservationCard(reservation: ReservationItem) {
