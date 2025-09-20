@@ -1,5 +1,47 @@
-### IntelliJ IDEA ###
+############################
+# ANDROID / ANDROID STUDIO
+############################
+
+# Builds / artefactos
+**/build/
+build/
+bin/
+gen/
 out/
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.log
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.cxx/
+.externalNativeBuild/
+captures/
+navigation.json
+
+# NDK / CMake
+**/.cxx/
+**/.externalNativeBuild/
+
+# Keystores (no subas firmas)
+*.jks
+*.keystore
+
+############################
+# TUS REGLAS ORIGINALES
+############################
+
+### IntelliJ IDEA ###
 !**/src/main/**/out/
 !**/src/test/**/out/
 
@@ -14,7 +56,6 @@ out/
 .settings
 .springBeans
 .sts4-cache
-bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
@@ -29,4 +70,9 @@ bin/
 .vscode/
 
 ### Mac OS ###
-.DS_Store*.hprof
+.DS_Store
+*.hprof
+
+### Windows ###
+Thumbs.db
+Desktop.ini
