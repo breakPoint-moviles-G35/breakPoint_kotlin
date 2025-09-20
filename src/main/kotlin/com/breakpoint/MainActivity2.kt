@@ -14,22 +14,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -137,13 +137,6 @@ fun BreakPointApp() {
     }
 }
 
-sealed class Destinations(val route: String, val label: String) {
-    data object Login : Destinations("login", "Login")
-    data object Explore : Destinations("explore", "Explore")
-    data object Rate : Destinations("rate", "Rate")
-    data object Reservations : Destinations("reservations", "Reservations")
-}
-
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations)
@@ -172,10 +165,11 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 ),
                 icon = {
                     val icon = when (destination) {
-                        Destinations.Login -> Icons.Default.Star
                         Destinations.Explore -> Icons.Default.Search
                         Destinations.Rate -> Icons.Default.Star
                         Destinations.Reservations -> Icons.Default.Star
+                        Destinations.DetailedSpace -> Icons.Default.Star
+                        Destinations.ReserveRoom -> Icons.Default.Star
                     }
                     Icon(imageVector = icon, contentDescription = destination.label)
                 },
@@ -187,103 +181,8 @@ private fun BottomNavigationBar(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(id = R.string.login_title),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(text = stringResource(id = R.string.login_username_label))
-        Spacer(modifier = Modifier.height(6.dp))
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            shadowElevation = 8.dp,
-            tonalElevation = 0.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            TextField(
-                value = username,
-                onValueChange = { username = it },
-                singleLine = true,
-                placeholder = { Text(stringResource(id = R.string.login_username_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                shape = MaterialTheme.shapes.extraLarge
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = stringResource(id = R.string.login_password_label))
-        Spacer(modifier = Modifier.height(6.dp))
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            shadowElevation = 8.dp,
-            tonalElevation = 0.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                singleLine = true,
-                placeholder = { Text(stringResource(id = R.string.login_password_placeholder)) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                shape = MaterialTheme.shapes.extraLarge
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onLoginSuccess,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            shape = MaterialTheme.shapes.extraLarge
-        ) {
-            Text(text = stringResource(id = R.string.login_button), fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ExploreScreen() {
+fun ExploreScreen(navController: NavHostController) {
     var query by remember { mutableStateOf("") }
-    var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState()
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -320,7 +219,7 @@ fun ExploreScreen() {
                 shadowElevation = 8.dp,
                 tonalElevation = 0.dp
             ) {
-                IconButton(onClick = { showDatePicker = true }) {
+                IconButton(onClick = { /* TODO: open filters */ }) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
             }
@@ -333,57 +232,24 @@ fun ExploreScreen() {
                 .padding(horizontal = 16.dp)
         ) {
             items(items) { space ->
-                SpaceCard(space)
+                SpaceCard(space = space, onClick = {
+                    navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                })
                 Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
-
-        if (showDatePicker) {
-            DatePickerDialog(
-                onDismissRequest = { showDatePicker = false },
-                confirmButton = {
-                    Button(
-                        onClick = { showDatePicker = false },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Text(text = stringResource(id = R.string.action_apply))
-                    }
-                },
-                dismissButton = {
-                    Button(
-                        onClick = { showDatePicker = false },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            contentColor = MaterialTheme.colorScheme.onSecondary
-                        )
-                    ) {
-                        Text(text = stringResource(id = R.string.action_cancel))
-                    }
-                }
-            ) {
-                DatePicker(state = datePickerState)
             }
         }
     }
 }
 
-data class SpaceItem(
-    val title: String,
-    val address: String,
-    val hour: String,
-    val rating: Double,
-    val price: Int
-)
 
 @Composable
-fun SpaceCard(space: SpaceItem) {
+fun SpaceCard(space: SpaceItem, onClick: () -> Unit = {}) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Box(
             modifier = Modifier
@@ -406,7 +272,7 @@ fun SpaceCard(space: SpaceItem) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Star, contentDescription = null)
                 Text(
-                    text = String.format(Locale.getDefault(), "%.2f", space.rating),
+                    text = String.format("%.2f", space.rating),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 8.dp)
                 )
@@ -417,7 +283,7 @@ fun SpaceCard(space: SpaceItem) {
         Text(space.hour, color = Color.Gray)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "$$$$",
+            text = "${'$'}${'$'}${'$'}${'$'}",
             fontWeight = FontWeight.SemiBold,
             textDecoration = TextDecoration.Underline
         )
@@ -425,9 +291,9 @@ fun SpaceCard(space: SpaceItem) {
 }
 
 private fun demoSpaces(): List<SpaceItem> = listOf(
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
+    SpaceItem("1", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("2", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("3", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
 )
 
 @Composable
@@ -436,11 +302,6 @@ private fun SimpleCenter(text: String) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) { Text(text = text, fontSize = 20.sp, fontWeight = FontWeight.Medium) }
-}
-
-@Composable
-private fun RateScreen() {
-    SimpleCenter(text = "Rate")
 }
 
 @Composable
@@ -502,12 +363,6 @@ fun ReservationsScreen() {
     }
 }
 
-data class ReservationItem(
-    val title: String,
-    val hour: String,
-    val address: String,
-    val rating: Double
-)
 
 @Composable
 fun ReservationCard(reservation: ReservationItem) {
@@ -537,7 +392,7 @@ fun ReservationCard(reservation: ReservationItem) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Star, contentDescription = null)
                 Text(
-                    text = String.format(Locale.getDefault(), "%.2f", reservation.rating),
+                    text = String.format("%.2f", reservation.rating),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 8.dp)
                 )
