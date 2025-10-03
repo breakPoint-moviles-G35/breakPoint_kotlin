@@ -79,8 +79,11 @@ object ApiProvider {
     private const val baseUrl = "http://10.0.2.2:3000/" // Android emulator to localhost
 
     @Volatile private var authToken: String? = null
+    @Volatile private var onUnauthorized: (() -> Unit)? = null
 
     fun setToken(token: String?) { authToken = token }
+    fun setOnUnauthorized(handler: (() -> Unit)?) { onUnauthorized = handler }
+    fun currentToken(): String? = authToken
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -88,7 +91,17 @@ object ApiProvider {
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .addInterceptor(AuthorizationInterceptor { authToken })
+            .addInterceptor { chain ->
+                val response = chain.proceed(
+                    chain.request().newBuilder().apply {
+                        authToken?.let { addHeader("Authorization", "Bearer $it") }
+                    }.build()
+                )
+                if (response.code == 401) {
+                    onUnauthorized?.invoke()
+                }
+                response
+            }
             .addInterceptor(logging)
             .build()
     }

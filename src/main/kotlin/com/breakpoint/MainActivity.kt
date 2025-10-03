@@ -67,6 +67,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,6 +102,13 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 @Composable
 fun BreakPointApp() {
     val navController = rememberNavController()
+    // 401 handler: vuelve al login limpiando back stack
+    ApiProvider.setOnUnauthorized {
+        navController.navigate(Destinations.Login.route) {
+            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     Scaffold(
@@ -110,6 +118,16 @@ fun BreakPointApp() {
             }
         }
     ) { padding ->
+        // Autologin: si hay token en DataStore, úsalo
+        val context = LocalContext.current
+        val tokenManager = remember { TokenManager(context) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            tokenManager.tokenFlow.collect { token ->
+                if (!token.isNullOrBlank()) {
+                    ApiProvider.setToken(token)
+                }
+            }
+        }
         NavHost(
             navController = navController,
             startDestination = Destinations.Login.route,
@@ -207,9 +225,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var isRegister by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf("Student") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var success by remember { mutableStateOf<String?>(null) }
     val repo = remember { AuthRepository() }
+    val ctx = LocalContext.current
+    val tokenManager = remember(ctx) { TokenManager(ctx) }
 
     Column(
         modifier = Modifier
@@ -288,6 +310,40 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     ),
                     shape = MaterialTheme.shapes.extraLarge
                 )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = "Rol")
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                var expanded by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(Color.White)
+                        .clickable { expanded = true }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Text(text = selectedRole)
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Student") },
+                            onClick = { selectedRole = "Student"; expanded = false }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Host") },
+                            onClick = { selectedRole = "Host"; expanded = false }
+                        )
+                    }
+                }
             }
         }
 
@@ -379,6 +435,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Button(
             onClick = {
                 error = null
+                success = null
                 loading = true
             },
             modifier = Modifier
@@ -402,21 +459,32 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         error = "Las contraseñas no coinciden"
                         return@LaunchedEffect
                     }
-                    repo.register(username, password, name.ifBlank { null })
+                    repo.register(username, password, name.ifBlank { null }, selectedRole)
                 } else {
                     repo.login(username, password)
                 }
                 loading = false
                 result.fold(
                     onSuccess = { if (isRegister) { /* tras registro, intenta login */
+                        success = "Usuario creado exitosamente"
                         val login = repo.login(username, password)
-                        login.fold(onSuccess = { onLoginSuccess() }, onFailure = { error = it.message ?: "Error tras registro" })
-                    } else onLoginSuccess() },
+                        login.fold(onSuccess = { 
+                            ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                            onLoginSuccess() 
+                        }, onFailure = { error = it.message ?: "Error tras registro" })
+                    } else {
+                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                        onLoginSuccess()
+                    } },
                     onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
                 )
             }
         }
 
+        if (success != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = success!!, color = Color(0xFF2E7D32))
+        }
         if (error != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = error!!, color = Color.Red)
@@ -432,6 +500,7 @@ fun ExploreScreen(navController: NavHostController) {
     val datePickerState = rememberDatePickerState()
     val repo = remember { SpaceRepository() }
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -451,7 +520,12 @@ fun ExploreScreen(navController: NavHostController) {
             ) {
                 TextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { 
+                        query = it
+                        filtered = if (query.isBlank()) items else items.filter { s ->
+                            s.title.contains(query, ignoreCase = true) || s.address.contains(query, ignoreCase = true)
+                        }
+                    },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     placeholder = { Text("Lorem ipsum?") },
@@ -475,13 +549,52 @@ fun ExploreScreen(navController: NavHostController) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
             }
+            // Sort selector
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp
+            ) {
+                var expanded by remember { mutableStateOf(false) }
+                var sort by remember { mutableStateOf("Relevancia") }
+                Box(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(Color.White)
+                        .clickable { expanded = true }
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) { Text(sort) }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Relevancia") }, onClick = {
+                        expanded = false; sort = "Relevancia"
+                        coroutineScope.launch {
+                            loading = true; error = null
+                            val result = repo.getSpaces()
+                            loading = false
+                            result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                        }
+                    })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Precio") }, onClick = {
+                        expanded = false; sort = "Precio"
+                        coroutineScope.launch {
+                            loading = true; error = null
+                            val result = repo.getSpacesSorted()
+                            loading = false
+                            result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                        }
+                    })
+                }
+            }
         }
 
         androidx.compose.runtime.LaunchedEffect(Unit) {
             val result = repo.getSpaces()
             loading = false
             result.fold(
-                onSuccess = { items = it },
+                onSuccess = { items = it; filtered = it },
                 onFailure = { error = it.message ?: "Error loading spaces" }
             )
         }
@@ -489,19 +602,39 @@ fun ExploreScreen(navController: NavHostController) {
             SimpleCenter(text = "Loading...")
         } else if (error != null) {
             SimpleCenter(text = error!!)
-        } else {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            items(items) { space ->
-                SpaceCard(space = space, onClick = {
-                    navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
-                })
-                Spacer(modifier = Modifier.height(24.dp))
+        } else if (filtered.isEmpty()) {
+            Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(text = "No hay resultados")
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = {
+                    coroutineScope.launch {
+                        loading = true; error = null
+                        val result = repo.getSpaces()
+                        loading = false
+                        result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                    }
+                }) { Text("Reintentar") }
             }
-        }
+        } else {
+            // List with simple pull-to-refresh via reload button on top (Compose foundation SwipeRefresh is in accompanist; avoid extra deps)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                item {
+                    Button(onClick = { coroutineScope.launch { loading = true; error = null; val res = repo.getSpaces(); loading=false; res.fold(onSuccess={ items=it; filtered=it }, onFailure={ error=it.message }) } }) {
+                        Text("Actualizar")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                items(filtered) { space ->
+                    SpaceCard(space = space, onClick = {
+                        navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                    })
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
         }
 
         if (showDatePicker) {
@@ -514,14 +647,14 @@ fun ExploreScreen(navController: NavHostController) {
                             val millis = datePickerState.selectedDateMillis
                             if (millis != null) {
                                 val start = java.time.Instant.ofEpochMilli(millis).toString()
-                                val end = java.time.Instant.ofEpochMilli(millis + 60L * 60 * 1000).toString()
+                                val end = java.time.Instant.ofEpochMilli(millis + 2L * 60 * 60 * 1000).toString()
                                 loading = true
                                 error = null
                                 coroutineScope.launch {
                                     val result = repo.getAvailable(start, end)
                                     loading = false
                                     result.fold(
-                                        onSuccess = { items = it },
+                                        onSuccess = { items = it; filtered = it },
                                         onFailure = { error = it.message ?: "Error loading availability" }
                                     )
                                 }
@@ -684,6 +817,7 @@ fun ProfileScreen() {
     val repo = remember { AuthRepository() }
     var email by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -694,6 +828,7 @@ fun ProfileScreen() {
             onSuccess = {
                 email = it.email
                 name = it.name ?: ""
+                role = it.role ?: ""
             },
             onFailure = { error = it.message ?: "Error cargando perfil" }
         )
@@ -729,9 +864,21 @@ fun ProfileScreen() {
                     if (name.isNotBlank()) {
                         Text(text = name, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
                     }
+                    if (role.isNotBlank()) {
+                        Text(text = role, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { /* TODO: cambiar contraseña */ }) {
                         Text("Cambiar contraseña")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val context = LocalContext.current
+                    val tokenManager = remember { TokenManager(context) }
+                    Button(onClick = { 
+                        // Clear token and rely on 401 handler
+                        ApiProvider.setToken(null)
+                    }) {
+                        Text("Cerrar sesión")
                     }
                 }
             }

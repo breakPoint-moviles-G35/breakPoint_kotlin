@@ -2,6 +2,7 @@ package com.breakpoint
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 
 class AuthRepository {
     suspend fun login(email: String, password: String): Result<UserDto> = withContext(Dispatchers.IO) {
@@ -10,16 +11,24 @@ class AuthRepository {
             ApiProvider.setToken(resp.access_token)
             Result.success(resp.user)
         } catch (t: Throwable) {
-            Result.failure(t)
+            if (t is HttpException && t.code() == 401) {
+                Result.failure(IllegalStateException("Credenciales inválidas"))
+            } else {
+                Result.failure(t)
+            }
         }
     }
 
-    suspend fun register(email: String, password: String, name: String?): Result<UserDto> = withContext(Dispatchers.IO) {
+    suspend fun register(email: String, password: String, name: String?, role: String?): Result<UserDto> = withContext(Dispatchers.IO) {
         return@withContext try {
-            val user = ApiProvider.auth.register(RegisterRequest(email, password, name))
+            val user = ApiProvider.auth.register(RegisterRequest(email, password, name, role))
             Result.success(user)
         } catch (t: Throwable) {
-            Result.failure(t)
+            if (t is HttpException && t.code() == 409) {
+                Result.failure(IllegalStateException("El correo ya está registrado"))
+            } else {
+                Result.failure(t)
+            }
         }
     }
 
@@ -52,6 +61,15 @@ class SpaceRepository {
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val list = ApiProvider.space.getSpaces().map { it.toSpaceItem() }
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getSpacesSorted(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.getSpacesSorted().map { it.toSpaceItem() }
             Result.success(list)
         } catch (t: Throwable) {
             Result.failure(t)
