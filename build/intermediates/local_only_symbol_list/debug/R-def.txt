@@ -10,3 +10,4 @@ string login_password_placeholder
 string login_title
 string login_username_label
 string login_username_placeholder
+xml network_security_config

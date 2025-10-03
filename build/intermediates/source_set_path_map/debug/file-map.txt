@@ -1,54 +1,54 @@
-com.breakpoint-jetified-material3-release-0 C:\Users\JUANITA\.gradle\caches\8.14\transforms\023da416edfdf8de07b124869ce76a33\transformed\jetified-material3-release\res
-com.breakpoint-jetified-core-ktx-1.12.0-1 C:\Users\JUANITA\.gradle\caches\8.14\transforms\028057e482696a275768c0e066330f72\transformed\jetified-core-ktx-1.12.0\res
-com.breakpoint-jetified-ui-release-2 C:\Users\JUANITA\.gradle\caches\8.14\transforms\07d0e6581d0d5ed50e88e7cf7b8640da\transformed\jetified-ui-release\res
-com.breakpoint-jetified-foundation-release-3 C:\Users\JUANITA\.gradle\caches\8.14\transforms\0fea02f4f0de30754527016c109aefb6\transformed\jetified-foundation-release\res
-com.breakpoint-jetified-savedstate-ktx-1.2.1-4 C:\Users\JUANITA\.gradle\caches\8.14\transforms\1772b13171af6fad86b4fefa2ca3cc6f\transformed\jetified-savedstate-ktx-1.2.1\res
-com.breakpoint-navigation-runtime-2.7.7-5 C:\Users\JUANITA\.gradle\caches\8.14\transforms\1b5374c6ff8a2fdd6edf2e473e453153\transformed\navigation-runtime-2.7.7\res
-com.breakpoint-jetified-ui-tooling-release-6 C:\Users\JUANITA\.gradle\caches\8.14\transforms\1ba1102078fe7432ba86f77d2d8dec1e\transformed\jetified-ui-tooling-release\res
-com.breakpoint-lifecycle-viewmodel-2.6.2-7 C:\Users\JUANITA\.gradle\caches\8.14\transforms\1d8ef676cb5a774a2fa24c70a4a50703\transformed\lifecycle-viewmodel-2.6.2\res
-com.breakpoint-lifecycle-livedata-core-2.6.2-8 C:\Users\JUANITA\.gradle\caches\8.14\transforms\1e4c77a98fd03eecb07e7142aa561517\transformed\lifecycle-livedata-core-2.6.2\res
-com.breakpoint-lifecycle-runtime-2.6.2-9 C:\Users\JUANITA\.gradle\caches\8.14\transforms\215742380d58386ae0bc8b6d8ab36f99\transformed\lifecycle-runtime-2.6.2\res
-com.breakpoint-jetified-ui-test-manifest-1.6.6-10 C:\Users\JUANITA\.gradle\caches\8.14\transforms\22fab704fcb4a0e81e2c770bc1830fb9\transformed\jetified-ui-test-manifest-1.6.6\res
-com.breakpoint-jetified-lifecycle-runtime-ktx-2.6.2-11 C:\Users\JUANITA\.gradle\caches\8.14\transforms\3008a506584706d76dba73b76098843b\transformed\jetified-lifecycle-runtime-ktx-2.6.2\res
-com.breakpoint-jetified-lifecycle-viewmodel-ktx-2.6.2-12 C:\Users\JUANITA\.gradle\caches\8.14\transforms\36ae972a9cfff5465ea6d8aa8cc8c55a\transformed\jetified-lifecycle-viewmodel-ktx-2.6.2\res
-com.breakpoint-jetified-material-release-13 C:\Users\JUANITA\.gradle\caches\8.14\transforms\3705ea9a175ab06a29bf2a394e394cd9\transformed\jetified-material-release\res
-com.breakpoint-navigation-common-2.7.7-14 C:\Users\JUANITA\.gradle\caches\8.14\transforms\37ddaf00f1739acb16ed95ac15c4a568\transformed\navigation-common-2.7.7\res
-com.breakpoint-navigation-common-ktx-2.7.7-15 C:\Users\JUANITA\.gradle\caches\8.14\transforms\402def660a9cc49acf23c0aa37673500\transformed\navigation-common-ktx-2.7.7\res
-com.breakpoint-core-1.12.0-16 C:\Users\JUANITA\.gradle\caches\8.14\transforms\4bf6ce96844612108e5242d3299a4022\transformed\core-1.12.0\res
-com.breakpoint-jetified-lifecycle-viewmodel-compose-2.6.2-17 C:\Users\JUANITA\.gradle\caches\8.14\transforms\4f049a8822ba1654b5c224183704b0aa\transformed\jetified-lifecycle-viewmodel-compose-2.6.2\res
-com.breakpoint-jetified-annotation-experimental-1.4.0-18 C:\Users\JUANITA\.gradle\caches\8.14\transforms\4f32ab5dbd4eabc8442081cfca9887fe\transformed\jetified-annotation-experimental-1.4.0\res
-com.breakpoint-jetified-navigation-compose-2.7.7-19 C:\Users\JUANITA\.gradle\caches\8.14\transforms\4fcfd2a34428a15595c31716b0327818\transformed\jetified-navigation-compose-2.7.7\res
-com.breakpoint-jetified-customview-poolingcontainer-1.0.0-20 C:\Users\JUANITA\.gradle\caches\8.14\transforms\54d90978e57a06b100921657bce44887\transformed\jetified-customview-poolingcontainer-1.0.0\res
-com.breakpoint-jetified-material-ripple-release-21 C:\Users\JUANITA\.gradle\caches\8.14\transforms\55a0d2670e1e0aba1e7983358a094e0f\transformed\jetified-material-ripple-release\res
-com.breakpoint-jetified-lifecycle-process-2.6.2-22 C:\Users\JUANITA\.gradle\caches\8.14\transforms\579ceddb14e2dd47936f76fbec519e2f\transformed\jetified-lifecycle-process-2.6.2\res
-com.breakpoint-jetified-emoji2-1.3.0-23 C:\Users\JUANITA\.gradle\caches\8.14\transforms\59a05c637f4223ee191fd48569181228\transformed\jetified-emoji2-1.3.0\res
-com.breakpoint-jetified-activity-ktx-1.8.2-24 C:\Users\JUANITA\.gradle\caches\8.14\transforms\5c9fa5015dff6f522ac734569545e59f\transformed\jetified-activity-ktx-1.8.2\res
-com.breakpoint-jetified-ui-tooling-preview-release-25 C:\Users\JUANITA\.gradle\caches\8.14\transforms\5f1a9d930de4d078f0944c5fa7f5adc1\transformed\jetified-ui-tooling-preview-release\res
-com.breakpoint-jetified-lifecycle-viewmodel-savedstate-2.6.2-26 C:\Users\JUANITA\.gradle\caches\8.14\transforms\6abdbc53f222b6aff99439dd1264e594\transformed\jetified-lifecycle-viewmodel-savedstate-2.6.2\res
-com.breakpoint-jetified-runtime-release-27 C:\Users\JUANITA\.gradle\caches\8.14\transforms\7be57b44fcea09e41c72876c2831c00b\transformed\jetified-runtime-release\res
-com.breakpoint-jetified-savedstate-1.2.1-28 C:\Users\JUANITA\.gradle\caches\8.14\transforms\857f784860ae01b927a7d115b29b06d6\transformed\jetified-savedstate-1.2.1\res
-com.breakpoint-navigation-runtime-ktx-2.7.7-29 C:\Users\JUANITA\.gradle\caches\8.14\transforms\8a2c96c70c443679297466d3599897f4\transformed\navigation-runtime-ktx-2.7.7\res
-com.breakpoint-jetified-activity-compose-1.8.2-30 C:\Users\JUANITA\.gradle\caches\8.14\transforms\9277c6c973fe9e1246f5fd20d7913b0e\transformed\jetified-activity-compose-1.8.2\res
-com.breakpoint-jetified-ui-unit-release-31 C:\Users\JUANITA\.gradle\caches\8.14\transforms\a0ce843c1a34854035eb19297e6b2390\transformed\jetified-ui-unit-release\res
-com.breakpoint-jetified-startup-runtime-1.1.1-32 C:\Users\JUANITA\.gradle\caches\8.14\transforms\a44065294917a466f865c5ea6ec35cce\transformed\jetified-startup-runtime-1.1.1\res
-com.breakpoint-jetified-material-icons-extended-release-33 C:\Users\JUANITA\.gradle\caches\8.14\transforms\a8a2d0e12c64fb9826675448ffb7d1c1\transformed\jetified-material-icons-extended-release\res
-com.breakpoint-jetified-animation-core-release-34 C:\Users\JUANITA\.gradle\caches\8.14\transforms\af01738480fa3d81bb9fb13771975e6f\transformed\jetified-animation-core-release\res
-com.breakpoint-jetified-ui-text-release-35 C:\Users\JUANITA\.gradle\caches\8.14\transforms\b4803538e8eb3a55b0d7cedac0e3ebae\transformed\jetified-ui-text-release\res
-com.breakpoint-jetified-foundation-layout-release-36 C:\Users\JUANITA\.gradle\caches\8.14\transforms\c32ff0995b491d467d3cad8fda897a19\transformed\jetified-foundation-layout-release\res
-com.breakpoint-jetified-runtime-saveable-release-37 C:\Users\JUANITA\.gradle\caches\8.14\transforms\c513c3bab496b14120609a5376426aa4\transformed\jetified-runtime-saveable-release\res
-com.breakpoint-jetified-ui-util-release-38 C:\Users\JUANITA\.gradle\caches\8.14\transforms\c5b690a7eb72d5e9437396b1a89eee04\transformed\jetified-ui-util-release\res
-com.breakpoint-jetified-ui-geometry-release-39 C:\Users\JUANITA\.gradle\caches\8.14\transforms\dd1b24b821cf567bc8798e649e8ec5bf\transformed\jetified-ui-geometry-release\res
-com.breakpoint-jetified-ui-tooling-data-release-40 C:\Users\JUANITA\.gradle\caches\8.14\transforms\e6074415f783b5dac6657994972a38c2\transformed\jetified-ui-tooling-data-release\res
-com.breakpoint-core-runtime-2.2.0-41 C:\Users\JUANITA\.gradle\caches\8.14\transforms\e834cee5aebadaeeec6f1d942e0e23e2\transformed\core-runtime-2.2.0\res
-com.breakpoint-jetified-animation-release-42 C:\Users\JUANITA\.gradle\caches\8.14\transforms\e9efad470d9c9278b9881c157737d285\transformed\jetified-animation-release\res
-com.breakpoint-jetified-material-icons-core-release-43 C:\Users\JUANITA\.gradle\caches\8.14\transforms\ec4971a93275d831c10f1209942a94d1\transformed\jetified-material-icons-core-release\res
-com.breakpoint-jetified-activity-1.8.2-44 C:\Users\JUANITA\.gradle\caches\8.14\transforms\f57c664a0adb7671b500b7d69447a083\transformed\jetified-activity-1.8.2\res
-com.breakpoint-jetified-ui-graphics-release-45 C:\Users\JUANITA\.gradle\caches\8.14\transforms\f5c09b816714167af684ac884c940f45\transformed\jetified-ui-graphics-release\res
-com.breakpoint-jetified-profileinstaller-1.3.0-46 C:\Users\JUANITA\.gradle\caches\8.14\transforms\fb1a450e0a6f9bf47d38aeca77307eb5\transformed\jetified-profileinstaller-1.3.0\res
-com.breakpoint-pngs-47 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\build\generated\res\pngs\debug
-com.breakpoint-resValues-48 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\build\generated\res\resValues\debug
-com.breakpoint-packageDebugResources-49 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\build\intermediates\incremental\debug\packageDebugResources\merged.dir
-com.breakpoint-packageDebugResources-50 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
-com.breakpoint-merged_res-51 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\build\intermediates\merged_res\debug
-com.breakpoint-debug-52 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\src\debug\res
-com.breakpoint-main-53 C:\Users\JUANITA\OneDrive - Universidad de los Andes\Documentos\UNIVERSIDAD\2025-02\Moviles\Repositories\breakPoint_kotlin\src\main\res
+com.breakpoint-jetified-material3-release-0 /Users/alejocatano02/.gradle/caches/8.14/transforms/023da416edfdf8de07b124869ce76a33/transformed/jetified-material3-release/res
+com.breakpoint-jetified-core-ktx-1.12.0-1 /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/res
+com.breakpoint-jetified-ui-release-2 /Users/alejocatano02/.gradle/caches/8.14/transforms/07d0e6581d0d5ed50e88e7cf7b8640da/transformed/jetified-ui-release/res
+com.breakpoint-jetified-foundation-release-3 /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/res
+com.breakpoint-jetified-savedstate-ktx-1.2.1-4 /Users/alejocatano02/.gradle/caches/8.14/transforms/1772b13171af6fad86b4fefa2ca3cc6f/transformed/jetified-savedstate-ktx-1.2.1/res
+com.breakpoint-navigation-runtime-2.7.7-5 /Users/alejocatano02/.gradle/caches/8.14/transforms/1b5374c6ff8a2fdd6edf2e473e453153/transformed/navigation-runtime-2.7.7/res
+com.breakpoint-jetified-ui-tooling-release-6 /Users/alejocatano02/.gradle/caches/8.14/transforms/1ba1102078fe7432ba86f77d2d8dec1e/transformed/jetified-ui-tooling-release/res
+com.breakpoint-lifecycle-viewmodel-2.6.2-7 /Users/alejocatano02/.gradle/caches/8.14/transforms/1d8ef676cb5a774a2fa24c70a4a50703/transformed/lifecycle-viewmodel-2.6.2/res
+com.breakpoint-lifecycle-livedata-core-2.6.2-8 /Users/alejocatano02/.gradle/caches/8.14/transforms/1e4c77a98fd03eecb07e7142aa561517/transformed/lifecycle-livedata-core-2.6.2/res
+com.breakpoint-lifecycle-runtime-2.6.2-9 /Users/alejocatano02/.gradle/caches/8.14/transforms/215742380d58386ae0bc8b6d8ab36f99/transformed/lifecycle-runtime-2.6.2/res
+com.breakpoint-jetified-ui-test-manifest-1.6.6-10 /Users/alejocatano02/.gradle/caches/8.14/transforms/22fab704fcb4a0e81e2c770bc1830fb9/transformed/jetified-ui-test-manifest-1.6.6/res
+com.breakpoint-jetified-lifecycle-runtime-ktx-2.6.2-11 /Users/alejocatano02/.gradle/caches/8.14/transforms/3008a506584706d76dba73b76098843b/transformed/jetified-lifecycle-runtime-ktx-2.6.2/res
+com.breakpoint-jetified-lifecycle-viewmodel-ktx-2.6.2-12 /Users/alejocatano02/.gradle/caches/8.14/transforms/36ae972a9cfff5465ea6d8aa8cc8c55a/transformed/jetified-lifecycle-viewmodel-ktx-2.6.2/res
+com.breakpoint-jetified-material-release-13 /Users/alejocatano02/.gradle/caches/8.14/transforms/3705ea9a175ab06a29bf2a394e394cd9/transformed/jetified-material-release/res
+com.breakpoint-navigation-common-2.7.7-14 /Users/alejocatano02/.gradle/caches/8.14/transforms/37ddaf00f1739acb16ed95ac15c4a568/transformed/navigation-common-2.7.7/res
+com.breakpoint-navigation-common-ktx-2.7.7-15 /Users/alejocatano02/.gradle/caches/8.14/transforms/402def660a9cc49acf23c0aa37673500/transformed/navigation-common-ktx-2.7.7/res
+com.breakpoint-core-1.12.0-16 /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/res
+com.breakpoint-jetified-lifecycle-viewmodel-compose-2.6.2-17 /Users/alejocatano02/.gradle/caches/8.14/transforms/4f049a8822ba1654b5c224183704b0aa/transformed/jetified-lifecycle-viewmodel-compose-2.6.2/res
+com.breakpoint-jetified-annotation-experimental-1.4.0-18 /Users/alejocatano02/.gradle/caches/8.14/transforms/4f32ab5dbd4eabc8442081cfca9887fe/transformed/jetified-annotation-experimental-1.4.0/res
+com.breakpoint-jetified-navigation-compose-2.7.7-19 /Users/alejocatano02/.gradle/caches/8.14/transforms/4fcfd2a34428a15595c31716b0327818/transformed/jetified-navigation-compose-2.7.7/res
+com.breakpoint-jetified-customview-poolingcontainer-1.0.0-20 /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/res
+com.breakpoint-jetified-material-ripple-release-21 /Users/alejocatano02/.gradle/caches/8.14/transforms/55a0d2670e1e0aba1e7983358a094e0f/transformed/jetified-material-ripple-release/res
+com.breakpoint-jetified-lifecycle-process-2.6.2-22 /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/res
+com.breakpoint-jetified-emoji2-1.3.0-23 /Users/alejocatano02/.gradle/caches/8.14/transforms/59a05c637f4223ee191fd48569181228/transformed/jetified-emoji2-1.3.0/res
+com.breakpoint-jetified-activity-ktx-1.8.2-24 /Users/alejocatano02/.gradle/caches/8.14/transforms/5c9fa5015dff6f522ac734569545e59f/transformed/jetified-activity-ktx-1.8.2/res
+com.breakpoint-jetified-ui-tooling-preview-release-25 /Users/alejocatano02/.gradle/caches/8.14/transforms/5f1a9d930de4d078f0944c5fa7f5adc1/transformed/jetified-ui-tooling-preview-release/res
+com.breakpoint-jetified-lifecycle-viewmodel-savedstate-2.6.2-26 /Users/alejocatano02/.gradle/caches/8.14/transforms/6abdbc53f222b6aff99439dd1264e594/transformed/jetified-lifecycle-viewmodel-savedstate-2.6.2/res
+com.breakpoint-jetified-runtime-release-27 /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/res
+com.breakpoint-jetified-savedstate-1.2.1-28 /Users/alejocatano02/.gradle/caches/8.14/transforms/857f784860ae01b927a7d115b29b06d6/transformed/jetified-savedstate-1.2.1/res
+com.breakpoint-navigation-runtime-ktx-2.7.7-29 /Users/alejocatano02/.gradle/caches/8.14/transforms/8a2c96c70c443679297466d3599897f4/transformed/navigation-runtime-ktx-2.7.7/res
+com.breakpoint-jetified-activity-compose-1.8.2-30 /Users/alejocatano02/.gradle/caches/8.14/transforms/9277c6c973fe9e1246f5fd20d7913b0e/transformed/jetified-activity-compose-1.8.2/res
+com.breakpoint-jetified-ui-unit-release-31 /Users/alejocatano02/.gradle/caches/8.14/transforms/a0ce843c1a34854035eb19297e6b2390/transformed/jetified-ui-unit-release/res
+com.breakpoint-jetified-startup-runtime-1.1.1-32 /Users/alejocatano02/.gradle/caches/8.14/transforms/a44065294917a466f865c5ea6ec35cce/transformed/jetified-startup-runtime-1.1.1/res
+com.breakpoint-jetified-material-icons-extended-release-33 /Users/alejocatano02/.gradle/caches/8.14/transforms/a8a2d0e12c64fb9826675448ffb7d1c1/transformed/jetified-material-icons-extended-release/res
+com.breakpoint-jetified-animation-core-release-34 /Users/alejocatano02/.gradle/caches/8.14/transforms/af01738480fa3d81bb9fb13771975e6f/transformed/jetified-animation-core-release/res
+com.breakpoint-jetified-ui-text-release-35 /Users/alejocatano02/.gradle/caches/8.14/transforms/b4803538e8eb3a55b0d7cedac0e3ebae/transformed/jetified-ui-text-release/res
+com.breakpoint-jetified-foundation-layout-release-36 /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/res
+com.breakpoint-jetified-runtime-saveable-release-37 /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/res
+com.breakpoint-jetified-ui-util-release-38 /Users/alejocatano02/.gradle/caches/8.14/transforms/c5b690a7eb72d5e9437396b1a89eee04/transformed/jetified-ui-util-release/res
+com.breakpoint-jetified-ui-geometry-release-39 /Users/alejocatano02/.gradle/caches/8.14/transforms/dd1b24b821cf567bc8798e649e8ec5bf/transformed/jetified-ui-geometry-release/res
+com.breakpoint-jetified-ui-tooling-data-release-40 /Users/alejocatano02/.gradle/caches/8.14/transforms/e6074415f783b5dac6657994972a38c2/transformed/jetified-ui-tooling-data-release/res
+com.breakpoint-core-runtime-2.2.0-41 /Users/alejocatano02/.gradle/caches/8.14/transforms/e834cee5aebadaeeec6f1d942e0e23e2/transformed/core-runtime-2.2.0/res
+com.breakpoint-jetified-animation-release-42 /Users/alejocatano02/.gradle/caches/8.14/transforms/e9efad470d9c9278b9881c157737d285/transformed/jetified-animation-release/res
+com.breakpoint-jetified-material-icons-core-release-43 /Users/alejocatano02/.gradle/caches/8.14/transforms/ec4971a93275d831c10f1209942a94d1/transformed/jetified-material-icons-core-release/res
+com.breakpoint-jetified-activity-1.8.2-44 /Users/alejocatano02/.gradle/caches/8.14/transforms/f57c664a0adb7671b500b7d69447a083/transformed/jetified-activity-1.8.2/res
+com.breakpoint-jetified-ui-graphics-release-45 /Users/alejocatano02/.gradle/caches/8.14/transforms/f5c09b816714167af684ac884c940f45/transformed/jetified-ui-graphics-release/res
+com.breakpoint-jetified-profileinstaller-1.3.0-46 /Users/alejocatano02/.gradle/caches/8.14/transforms/fb1a450e0a6f9bf47d38aeca77307eb5/transformed/jetified-profileinstaller-1.3.0/res
+com.breakpoint-pngs-47 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/build/generated/res/pngs/debug
+com.breakpoint-resValues-48 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/build/generated/res/resValues/debug
+com.breakpoint-packageDebugResources-49 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.breakpoint-packageDebugResources-50 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.breakpoint-merged_res-51 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/build/intermediates/merged_res/debug
+com.breakpoint-debug-52 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/debug/res
+com.breakpoint-main-53 /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/res

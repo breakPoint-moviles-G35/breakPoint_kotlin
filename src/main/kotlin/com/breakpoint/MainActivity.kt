@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +65,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,6 +128,7 @@ fun BreakPointApp() {
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
             composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
             composable(Destinations.Reservations.route) { ReservationsScreen() }
+            composable(Destinations.Profile.route) { ProfileScreen() }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 DetailedSpaceScreen(spaceId = spaceId, navController = navController)
@@ -142,6 +146,7 @@ sealed class Destinations(val route: String, val label: String) {
     data object Explore : Destinations("explore", "Explore")
     data object Rate : Destinations("rate", "Rate")
     data object Reservations : Destinations("reservations", "Reservations")
+    data object Profile : Destinations("profile", "Profile")
     data object DetailedSpace : Destinations("detailed_space/{spaceId}", "Space Details") {
         fun createRoute(spaceId: String) = "detailed_space/$spaceId"
     }
@@ -152,7 +157,7 @@ sealed class Destinations(val route: String, val label: String) {
 
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
-    val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations)
+    val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations, Destinations.Profile)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     NavigationBar(
@@ -179,6 +184,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 icon = {
                     val icon = when (destination) {
                         Destinations.Explore -> Icons.Default.Search
+                        Destinations.Profile -> Icons.Default.Person
                         Destinations.Rate,
                         Destinations.Reservations,
                         Destinations.DetailedSpace,
@@ -198,6 +204,12 @@ private fun BottomNavigationBar(navController: NavHostController) {
 fun LoginScreen(onLoginSuccess: () -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isRegister by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val repo = remember { AuthRepository() }
 
     Column(
         modifier = Modifier
@@ -205,8 +217,44 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(12.dp))
+        // Toggle Login/Register
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(Color.White)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .background(if (!isRegister) MaterialTheme.colorScheme.primary else Color.White)
+                            .clickable { isRegister = false }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Login", color = if (!isRegister) MaterialTheme.colorScheme.onPrimary else Color.Black) }
+                    Box(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .background(if (isRegister) MaterialTheme.colorScheme.primary else Color.White)
+                            .clickable { isRegister = true }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Register", color = if (isRegister) MaterialTheme.colorScheme.onPrimary else Color.Black) }
+                }
+            }
+        }
+
         Text(
-            text = stringResource(id = R.string.login_title),
+            text = if (isRegister) "Crear cuenta" else stringResource(id = R.string.login_title),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
@@ -214,6 +262,34 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium
         )
+
+        if (isRegister) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = "Nombre (opcional)")
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    placeholder = { Text("Tu nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledContainerColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = MaterialTheme.shapes.extraLarge
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
         Text(text = stringResource(id = R.string.login_username_label))
@@ -269,9 +345,42 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             )
         }
 
+        if (isRegister) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = "Confirmar contraseña")
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                shadowElevation = 8.dp,
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    singleLine = true,
+                    placeholder = { Text("Repite tu contraseña") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledContainerColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = MaterialTheme.shapes.extraLarge
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
         Button(
-            onClick = onLoginSuccess,
+            onClick = {
+                error = null
+                loading = true
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
@@ -281,7 +390,36 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             ),
             shape = MaterialTheme.shapes.extraLarge
         ) {
-            Text(text = stringResource(id = R.string.login_button), fontWeight = FontWeight.SemiBold)
+            val label = if (isRegister) "Crear cuenta" else stringResource(id = R.string.login_button)
+            Text(text = if (loading) "Procesando..." else label, fontWeight = FontWeight.SemiBold)
+        }
+
+        if (loading) {
+            androidx.compose.runtime.LaunchedEffect(username + "|" + password + "|" + isRegister + "|" + confirm + "|" + name) {
+                val result = if (isRegister) {
+                    if (password != confirm) {
+                        loading = false
+                        error = "Las contraseñas no coinciden"
+                        return@LaunchedEffect
+                    }
+                    repo.register(username, password, name.ifBlank { null })
+                } else {
+                    repo.login(username, password)
+                }
+                loading = false
+                result.fold(
+                    onSuccess = { if (isRegister) { /* tras registro, intenta login */
+                        val login = repo.login(username, password)
+                        login.fold(onSuccess = { onLoginSuccess() }, onFailure = { error = it.message ?: "Error tras registro" })
+                    } else onLoginSuccess() },
+                    onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
+                )
+            }
+        }
+
+        if (error != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = error!!, color = Color.Red)
         }
     }
 }
@@ -292,6 +430,11 @@ fun ExploreScreen(navController: NavHostController) {
     var query by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
+    val repo = remember { SpaceRepository() }
+    var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -334,7 +477,19 @@ fun ExploreScreen(navController: NavHostController) {
             }
         }
 
-        val items = remember { demoSpaces() }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            val result = repo.getSpaces()
+            loading = false
+            result.fold(
+                onSuccess = { items = it },
+                onFailure = { error = it.message ?: "Error loading spaces" }
+            )
+        }
+        if (loading) {
+            SimpleCenter(text = "Loading...")
+        } else if (error != null) {
+            SimpleCenter(text = error!!)
+        } else {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -347,13 +502,31 @@ fun ExploreScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+        }
 
         if (showDatePicker) {
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
                     Button(
-                        onClick = { showDatePicker = false },
+                        onClick = {
+                            showDatePicker = false
+                            val millis = datePickerState.selectedDateMillis
+                            if (millis != null) {
+                                val start = java.time.Instant.ofEpochMilli(millis).toString()
+                                val end = java.time.Instant.ofEpochMilli(millis + 60L * 60 * 1000).toString()
+                                loading = true
+                                error = null
+                                coroutineScope.launch {
+                                    val result = repo.getAvailable(start, end)
+                                    loading = false
+                                    result.fold(
+                                        onSuccess = { items = it },
+                                        onFailure = { error = it.message ?: "Error loading availability" }
+                                    )
+                                }
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -501,6 +674,66 @@ fun ReservationsScreen() {
             items(items) { reservation ->
                 ReservationCard(reservation)
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfileScreen() {
+    val repo = remember { AuthRepository() }
+    var email by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val result = repo.profile()
+        loading = false
+        result.fold(
+            onSuccess = {
+                email = it.email
+                name = it.name ?: ""
+            },
+            onFailure = { error = it.message ?: "Error cargando perfil" }
+        )
+    }
+
+    if (loading) {
+        SimpleCenter(text = "Cargando perfil...")
+    } else if (error != null) {
+        SimpleCenter(text = error!!)
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = "Mi perfil", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(text = email, style = MaterialTheme.typography.bodyLarge)
+                    if (name.isNotBlank()) {
+                        Text(text = name, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { /* TODO: cambiar contraseña */ }) {
+                        Text("Cambiar contraseña")
+                    }
+                }
             }
         }
     }
