@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -68,6 +70,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.VisualTransformation
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,7 +149,7 @@ fun BreakPointApp() {
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
             composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
             composable(Destinations.Reservations.route) { ReservationsScreen() }
-            composable(Destinations.Profile.route) { ProfileScreen() }
+            composable(Destinations.Profile.route) { ProfileScreen(navController) }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 DetailedSpaceScreen(spaceId = spaceId, navController = navController)
@@ -229,6 +232,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    var showPassword by remember { mutableStateOf(false) }
+    var showConfirm by remember { mutableStateOf(false) }
     val repo = remember { AuthRepository() }
     val ctx = LocalContext.current
     val tokenManager = remember(ctx) { TokenManager(ctx) }
@@ -387,8 +392,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 onValueChange = { password = it },
                 singleLine = true,
                 placeholder = { Text(stringResource(id = R.string.login_password_placeholder)) },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        val icon = if (showPassword) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility
+                        Icon(icon, contentDescription = if (showPassword) "Ocultar" else "Mostrar")
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
@@ -416,8 +427,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     onValueChange = { confirm = it },
                     singleLine = true,
                     placeholder = { Text("Repite tu contraseña") },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { showConfirm = !showConfirm }) {
+                            val icon = if (showConfirm) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility
+                            Icon(icon, contentDescription = if (showConfirm) "Ocultar" else "Mostrar")
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -432,11 +449,45 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+        val coroutineScope = rememberCoroutineScope()
         Button(
             onClick = {
+                if (loading) return@Button
                 error = null
                 success = null
                 loading = true
+                coroutineScope.launch {
+                    val result = if (isRegister) {
+                        if (password != confirm) {
+                            loading = false
+                            error = "Las contraseñas no coinciden"
+                            return@launch
+                        }
+                        repo.register(username, password, name.ifBlank { null }, selectedRole)
+                    } else {
+                        repo.login(username, password)
+                    }
+                    result.fold(
+                        onSuccess = {
+                            if (isRegister) {
+                                success = "Usuario creado exitosamente"
+                                val login = repo.login(username, password)
+                                login.fold(
+                                    onSuccess = {
+                                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                        onLoginSuccess()
+                                    },
+                                    onFailure = { error = it.message ?: "Error tras registro" }
+                                )
+                            } else {
+                                ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                onLoginSuccess()
+                            }
+                        },
+                        onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
+                    )
+                    loading = false
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -445,40 +496,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ),
-            shape = MaterialTheme.shapes.extraLarge
+            shape = MaterialTheme.shapes.extraLarge,
+            enabled = if (isRegister) username.isNotBlank() && password.isNotBlank() && confirm.isNotBlank() && !loading else username.isNotBlank() && password.isNotBlank() && !loading
         ) {
             val label = if (isRegister) "Crear cuenta" else stringResource(id = R.string.login_button)
             Text(text = if (loading) "Procesando..." else label, fontWeight = FontWeight.SemiBold)
-        }
-
-        if (loading) {
-            androidx.compose.runtime.LaunchedEffect(username + "|" + password + "|" + isRegister + "|" + confirm + "|" + name) {
-                val result = if (isRegister) {
-                    if (password != confirm) {
-                        loading = false
-                        error = "Las contraseñas no coinciden"
-                        return@LaunchedEffect
-                    }
-                    repo.register(username, password, name.ifBlank { null }, selectedRole)
-                } else {
-                    repo.login(username, password)
-                }
-                loading = false
-                result.fold(
-                    onSuccess = { if (isRegister) { /* tras registro, intenta login */
-                        success = "Usuario creado exitosamente"
-                        val login = repo.login(username, password)
-                        login.fold(onSuccess = { 
-                            ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                            onLoginSuccess() 
-                        }, onFailure = { error = it.message ?: "Error tras registro" })
-                    } else {
-                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                        onLoginSuccess()
-                    } },
-                    onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
-                )
-            }
         }
 
         if (success != null) {
@@ -504,6 +526,10 @@ fun ExploreScreen(navController: NavHostController) {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var showHourPicker by remember { mutableStateOf(false) }
+    var startHour by remember { mutableStateOf<Int?>(null) }
+    var endHour by remember { mutableStateOf<Int?>(null) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -646,18 +672,17 @@ fun ExploreScreen(navController: NavHostController) {
                             showDatePicker = false
                             val millis = datePickerState.selectedDateMillis
                             if (millis != null) {
-                                val start = java.time.Instant.ofEpochMilli(millis).toString()
-                                val end = java.time.Instant.ofEpochMilli(millis + 2L * 60 * 60 * 1000).toString()
-                                loading = true
-                                error = null
-                                coroutineScope.launch {
-                                    val result = repo.getAvailable(start, end)
-                                    loading = false
-                                    result.fold(
-                                        onSuccess = { items = it; filtered = it },
-                                        onFailure = { error = it.message ?: "Error loading availability" }
-                                    )
+                                // Restringe a máximo 7 días de anticipación
+                                val oneWeekMs = 7L * 24 * 60 * 60 * 1000
+                                val now = System.currentTimeMillis()
+                                if (millis > now + oneWeekMs) {
+                                    error = "Solo se permite reservar con máximo una semana de anticipación"
+                                    return@Button
                                 }
+                                selectedDateMillis = millis
+                                startHour = null
+                                endHour = null
+                                showHourPicker = true
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -681,6 +706,93 @@ fun ExploreScreen(navController: NavHostController) {
                 }
             ) {
                 DatePicker(state = datePickerState)
+            }
+        }
+    }
+
+    if (showHourPicker && selectedDateMillis != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showHourPicker = false },
+            confirmButton = {},
+            dismissButton = {},
+            title = { Text("Selecciona horas") },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HourDropdown(label = "Desde", hour = startHour, onHourSelected = {
+                        startHour = it
+                        val sh = startHour; val eh = endHour
+                        if (sh != null && eh != null && eh > sh) {
+                            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+                            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                            val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                            cal.time = java.util.Date(selectedDateMillis!!)
+                            cal.set(java.util.Calendar.MINUTE, 0)
+                            cal.set(java.util.Calendar.SECOND, 0)
+                            cal.set(java.util.Calendar.MILLISECOND, 0)
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, sh)
+                            val startIso = sdf.format(cal.time)
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, eh)
+                            val endIso = sdf.format(cal.time)
+                            loading = true; error = null
+                            coroutineScope.launch {
+                                val res = repo.getAvailable(startIso, endIso)
+                                loading = false
+                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message ?: "Error loading availability" })
+                            }
+                            showHourPicker = false
+                        }
+                    })
+                    HourDropdown(label = "Hasta", hour = endHour, onHourSelected = {
+                        endHour = it
+                        val sh = startHour; val eh = endHour
+                        if (sh != null && eh != null && eh > sh) {
+                            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+                            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                            val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                            cal.time = java.util.Date(selectedDateMillis!!)
+                            cal.set(java.util.Calendar.MINUTE, 0)
+                            cal.set(java.util.Calendar.SECOND, 0)
+                            cal.set(java.util.Calendar.MILLISECOND, 0)
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, sh)
+                            val startIso = sdf.format(cal.time)
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, eh)
+                            val endIso = sdf.format(cal.time)
+                            loading = true; error = null
+                            coroutineScope.launch {
+                                val res = repo.getAvailable(startIso, endIso)
+                                loading = false
+                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message ?: "Error loading availability" })
+                            }
+                            showHourPicker = false
+                        }
+                    })
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun HourDropdown(label: String, hour: Int?, onHourSelected: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = remember { (0..23).toList() }
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(Color.White)
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) { Text(text = (hour?.let { String.format("%s %02d:00", label, it) } ?: label)) }
+        androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { h ->
+                androidx.compose.material3.DropdownMenuItem(text = { Text(String.format("%02d:00", h)) }, onClick = {
+                    expanded = false; onHourSelected(h)
+                })
             }
         }
     }
@@ -813,7 +925,7 @@ fun ReservationsScreen() {
 }
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(navController: NavHostController) {
     val repo = remember { AuthRepository() }
     var email by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
@@ -874,9 +986,16 @@ fun ProfileScreen() {
                     Spacer(modifier = Modifier.height(8.dp))
                     val context = LocalContext.current
                     val tokenManager = remember { TokenManager(context) }
+                    val scope = rememberCoroutineScope()
                     Button(onClick = { 
-                        // Clear token and rely on 401 handler
+                        scope.launch {
+                            tokenManager.clear()
+                        }
                         ApiProvider.setToken(null)
+                        navController.navigate(Destinations.Login.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }) {
                         Text("Cerrar sesión")
                     }
