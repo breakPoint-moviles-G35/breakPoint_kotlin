@@ -146,7 +146,7 @@ fun BreakPointApp() {
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
             composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
             composable(Destinations.Reservations.route) { ReservationsScreen() }
-            composable(Destinations.Profile.route) { ProfileScreen() }
+            composable(Destinations.Profile.route) { ProfileScreen(navController) }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 DetailedSpaceScreen(spaceId = spaceId, navController = navController)
@@ -651,8 +651,10 @@ fun ExploreScreen(navController: NavHostController) {
                             showDatePicker = false
                             val millis = datePickerState.selectedDateMillis
                             if (millis != null) {
-                                val start = java.time.Instant.ofEpochMilli(millis).toString()
-                                val end = java.time.Instant.ofEpochMilli(millis + 2L * 60 * 60 * 1000).toString()
+                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+                                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                val start = sdf.format(java.util.Date(millis))
+                                val end = sdf.format(java.util.Date(millis + 2L * 60 * 60 * 1000))
                                 loading = true
                                 error = null
                                 coroutineScope.launch {
@@ -818,7 +820,7 @@ fun ReservationsScreen() {
 }
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(navController: NavHostController) {
     val repo = remember { AuthRepository() }
     var email by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
@@ -879,9 +881,16 @@ fun ProfileScreen() {
                     Spacer(modifier = Modifier.height(8.dp))
                     val context = LocalContext.current
                     val tokenManager = remember { TokenManager(context) }
+                    val scope = rememberCoroutineScope()
                     Button(onClick = { 
-                        // Clear token and rely on 401 handler
+                        scope.launch {
+                            tokenManager.clear()
+                        }
                         ApiProvider.setToken(null)
+                        navController.navigate(Destinations.Login.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }) {
                         Text("Cerrar sesión")
                     }
