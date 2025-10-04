@@ -432,11 +432,45 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+        val coroutineScope = rememberCoroutineScope()
         Button(
             onClick = {
+                if (loading) return@Button
                 error = null
                 success = null
                 loading = true
+                coroutineScope.launch {
+                    val result = if (isRegister) {
+                        if (password != confirm) {
+                            loading = false
+                            error = "Las contraseñas no coinciden"
+                            return@launch
+                        }
+                        repo.register(username, password, name.ifBlank { null }, selectedRole)
+                    } else {
+                        repo.login(username, password)
+                    }
+                    result.fold(
+                        onSuccess = {
+                            if (isRegister) {
+                                success = "Usuario creado exitosamente"
+                                val login = repo.login(username, password)
+                                login.fold(
+                                    onSuccess = {
+                                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                        onLoginSuccess()
+                                    },
+                                    onFailure = { error = it.message ?: "Error tras registro" }
+                                )
+                            } else {
+                                ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                onLoginSuccess()
+                            }
+                        },
+                        onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
+                    )
+                    loading = false
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -445,40 +479,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ),
-            shape = MaterialTheme.shapes.extraLarge
+            shape = MaterialTheme.shapes.extraLarge,
+            enabled = if (isRegister) username.isNotBlank() && password.isNotBlank() && confirm.isNotBlank() && !loading else username.isNotBlank() && password.isNotBlank() && !loading
         ) {
             val label = if (isRegister) "Crear cuenta" else stringResource(id = R.string.login_button)
             Text(text = if (loading) "Procesando..." else label, fontWeight = FontWeight.SemiBold)
-        }
-
-        if (loading) {
-            androidx.compose.runtime.LaunchedEffect(username + "|" + password + "|" + isRegister + "|" + confirm + "|" + name) {
-                val result = if (isRegister) {
-                    if (password != confirm) {
-                        loading = false
-                        error = "Las contraseñas no coinciden"
-                        return@LaunchedEffect
-                    }
-                    repo.register(username, password, name.ifBlank { null }, selectedRole)
-                } else {
-                    repo.login(username, password)
-                }
-                loading = false
-                result.fold(
-                    onSuccess = { if (isRegister) { /* tras registro, intenta login */
-                        success = "Usuario creado exitosamente"
-                        val login = repo.login(username, password)
-                        login.fold(onSuccess = { 
-                            ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                            onLoginSuccess() 
-                        }, onFailure = { error = it.message ?: "Error tras registro" })
-                    } else {
-                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                        onLoginSuccess()
-                    } },
-                    onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
-                )
-            }
         }
 
         if (success != null) {
