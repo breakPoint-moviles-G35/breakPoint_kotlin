@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +14,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -51,9 +56,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +72,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -238,10 +250,19 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val ctx = LocalContext.current
     val tokenManager = remember(ctx) { TokenManager(ctx) }
 
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val nameRequester = remember { FocusRequester() }
+    val usernameRequester = remember { FocusRequester() }
+    val passwordRequester = remember { FocusRequester() }
+    val confirmRequester = remember { FocusRequester() }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp)
+            .verticalScroll(scrollState)
+            .imePadding()
     ) {
         Spacer(modifier = Modifier.height(12.dp))
         // Toggle Login/Register
@@ -305,7 +326,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     onValueChange = { name = it },
                     singleLine = true,
                     placeholder = { Text("Tu nombre") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(nameRequester),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(
+                        onNext = { usernameRequester.requestFocus() }
+                    ),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
@@ -366,7 +393,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 onValueChange = { username = it },
                 singleLine = true,
                 placeholder = { Text(stringResource(id = R.string.login_username_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(usernameRequester),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { passwordRequester.requestFocus() }
+                ),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
@@ -393,14 +429,29 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 singleLine = true,
                 placeholder = { Text(stringResource(id = R.string.login_password_placeholder)) },
                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = if (isRegister) ImeAction.Next else ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { if (isRegister) confirmRequester.requestFocus() },
+                    onDone = {
+                        if (!isRegister) {
+                            error = null
+                            success = null
+                            loading = true
+                        }
+                    }
+                ),
                 trailingIcon = {
                     IconButton(onClick = { showPassword = !showPassword }) {
                         val icon = if (showPassword) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility
                         Icon(icon, contentDescription = if (showPassword) "Ocultar" else "Mostrar")
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(passwordRequester),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
@@ -428,14 +479,26 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     singleLine = true,
                     placeholder = { Text("Repite tu contraseña") },
                     visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            error = null
+                            success = null
+                            loading = true
+                        }
+                    ),
                     trailingIcon = {
                         IconButton(onClick = { showConfirm = !showConfirm }) {
                             val icon = if (showConfirm) androidx.compose.material.icons.Icons.Default.VisibilityOff else androidx.compose.material.icons.Icons.Default.Visibility
                             Icon(icon, contentDescription = if (showConfirm) "Ocultar" else "Mostrar")
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(confirmRequester),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
@@ -807,13 +870,25 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(Color(0xFFE0E0E0))
-        )
+        if (!space.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = space.imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(MaterialTheme.shapes.medium),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color(0xFFE0E0E0))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -847,9 +922,9 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
 }
 
 private fun demoSpaces(): List<SpaceItem> = listOf(
-    SpaceItem("1", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("2", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("3", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
+    SpaceItem("1", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("2", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("3", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30)
 )
 
 @Composable
@@ -867,7 +942,22 @@ private fun RateScreen() {
 
 @Composable
 fun ReservationsScreen() {
+    val repo = remember { BookingRepository() }
     var query by remember { mutableStateOf("") }
+    var items by remember { mutableStateOf<List<BookingListItemDto>>(emptyList()) }
+    var filtered by remember { mutableStateOf<List<BookingListItemDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val result = repo.listMyBookings()
+        loading = false
+        result.fold(
+            onSuccess = { list -> items = list; filtered = list },
+            onFailure = { t -> error = t.message ?: "Error cargando reservas" }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -884,10 +974,13 @@ fun ReservationsScreen() {
             ) {
                 TextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { q ->
+                        query = q
+                        filtered = if (q.isBlank()) items else items.filter { it.space?.title?.contains(q, ignoreCase = true) == true || it.status.contains(q, ignoreCase = true) }
+                    },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    placeholder = { Text("Search reservations") },
+                    placeholder = { Text("Buscar reservas") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -904,23 +997,97 @@ fun ReservationsScreen() {
                 shadowElevation = 8.dp,
                 tonalElevation = 0.dp
             ) {
-                IconButton(onClick = { /* TODO: open reservation filters */ }) {
+                IconButton(onClick = { /* filtros opcionales */ }) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
             }
         }
 
-        val items = remember { demoReservations() }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            items(items) { reservation ->
-                ReservationCard(reservation)
-                Spacer(modifier = Modifier.height(24.dp))
+        if (loading) {
+            SimpleCenter(text = "Cargando...")
+        } else if (error != null) {
+            SimpleCenter(text = error!!)
+        } else if (filtered.isEmpty()) {
+            SimpleCenter(text = "No tienes reservas")
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                items(filtered) { booking ->
+                    BookingCard(booking)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.Divider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun BookingCard(booking: BookingListItemDto) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(MaterialTheme.shapes.medium)
+        ) {
+            if (!booking.space?.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = booking.space?.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFE0E0E0))
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    booking.space?.title ?: "Espacio",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(text = booking.status, color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(formatBookingTime(booking), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            val amount = booking.totalAmount?.let { amt ->
+                val curr = booking.currency ?: ""
+                if (curr.isNotBlank()) "$curr $amt" else amt
+            }
+            if (!amount.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(amount, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun formatBookingTime(b: BookingListItemDto): String {
+    return try {
+        val start = java.time.Instant.parse(b.slotStart).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+        val end = java.time.Instant.parse(b.slotEnd).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+        val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MMM dd", java.util.Locale.getDefault())
+        val timeFmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.getDefault())
+        "${start.format(dateFmt)} • ${start.format(timeFmt)} - ${end.format(timeFmt)}"
+    } catch (_: Throwable) {
+        "${'$'}{b.slotStart} - ${'$'}{b.slotEnd}"
     }
 }
 

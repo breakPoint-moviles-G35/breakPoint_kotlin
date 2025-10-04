@@ -26,14 +26,27 @@ data class UserDto(
 data class SpaceDto(
     val id: String,
     val title: String,
+    val imageUrl: String?,
     val geo: String?,
     val capacity: Int,
     val amenities: List<String>?,
     val accessibility: List<String>?,
     val rules: String?,
-    // TypeORM decimal suele serializarse como string
-    val base_price_per_30m: String?,
+    val price: String?,
     val rating_avg: Double?
+)
+
+// Booking
+data class CreateBookingRequest(
+    val spaceId: String,
+    val slotStart: String,
+    val slotEnd: String,
+    val guestCount: Int
+)
+
+data class BookingDto(
+    val id: String,
+    val status: String
 )
 
 interface AuthApi {
@@ -60,6 +73,32 @@ interface SpaceApi {
         @Query("end") end: String
     ): List<SpaceDto>
 }
+
+interface BookingApi {
+    @POST("booking")
+    suspend fun create(@Body body: CreateBookingRequest): BookingDto
+
+    @GET("booking")
+    suspend fun listMine(): List<BookingListItemDto>
+}
+
+data class BookingListItemDto(
+    val id: String,
+    val status: String,
+    val slotStart: String,
+    val slotEnd: String,
+    val totalAmount: String?,
+    val currency: String?,
+    val space: SpaceSummaryDto?
+)
+
+data class SpaceSummaryDto(
+    val id: String?,
+    val title: String?,
+    val imageUrl: String?,
+    val price: String?,
+    val capacity: Int?
+)
 
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
@@ -116,6 +155,7 @@ object ApiProvider {
 
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
+    val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
 }
 
 
