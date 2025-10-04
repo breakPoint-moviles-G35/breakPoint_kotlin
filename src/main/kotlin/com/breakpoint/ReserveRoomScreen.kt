@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +52,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import android.view.Gravity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +76,12 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
     var selectedTime by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf(1) }
     var guestCount by remember { mutableStateOf(1) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var success by remember { mutableStateOf<String?>(null) }
+    val repo = remember { BookingRepository() }
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
     
     val totalPrice = space.price * duration
     
@@ -256,9 +275,52 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = { 
-                        // TODO: Process reservation
-                        navController.popBackStack()
+                    onClick = {
+                        error = null
+                        loading = true
+                        if (selectedDate.isBlank()) {
+                            loading = false
+                            Toast.makeText(ctx, "Selecciona una fecha", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (selectedTime.isBlank()) {
+                            loading = false
+                            Toast.makeText(ctx, "Selecciona una hora", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (duration <= 0) {
+                            loading = false
+                            Toast.makeText(ctx, "Selecciona una duración válida", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (guestCount <= 0) {
+                            loading = false
+                            Toast.makeText(ctx, "Selecciona el número de invitados", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        scope.launch {
+                            try {
+                                val date = LocalDate.parse(selectedDate, DateTimeFormatter.ISO_LOCAL_DATE)
+                                val time = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+                                val startLdt = LocalDateTime.of(date, time)
+                                val zone = ZoneId.systemDefault()
+                                val startIso = startLdt.atZone(zone).toInstant().toString()
+                                val endIso = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant().toString()
+                                val res = repo.createBooking(spaceId, startIso, endIso, guestCount)
+                                loading = false
+                                res.fold(
+                                    onSuccess = {
+                                        success = "Tu reserva fue creada exitosamente."
+                                    },
+                                    onFailure = {
+                                        error = it.message ?: "Error creando reserva"
+                                    }
+                                )
+                            } catch (t: Throwable) {
+                                loading = false
+                                error = t.message ?: "Error creando reserva"
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -267,10 +329,10 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = selectedDate.isNotEmpty() && selectedTime.isNotEmpty()
+                    enabled = selectedDate.isNotEmpty() && selectedTime.isNotEmpty() && !loading
                 ) {
                     Text(
-                        text = "Reserve for $${totalPrice}",
+                        text = if (loading) "Reservando..." else "Reserve for $${totalPrice}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -280,6 +342,29 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+        if (error != null) {
+            AlertDialog(
+                onDismissRequest = { error = null },
+                confirmButton = {
+                    TextButton(onClick = { error = null }) { Text("OK") }
+                },
+                title = { Text("No se pudo crear la reserva") },
+                text = { Text(error ?: "Intenta de nuevo") }
+            )
+        }
+        if (success != null) {
+            AlertDialog(
+                onDismissRequest = { success = null },
+                confirmButton = {
+                    TextButton(onClick = {
+                        success = null
+                        navController.navigate(Destinations.Reservations.route)
+                    }) { Text("Ver reservas") }
+                },
+                title = { Text("Reserva confirmada") },
+                text = { Text(success ?: "Tu reserva fue creada exitosamente") }
+            )
         }
     }
 }

@@ -45,8 +45,8 @@ class AuthRepository {
 class SpaceRepository {
     private fun SpaceDto.toSpaceItem(): SpaceItem {
         val hourlyPrice = try {
-            val per30 = (base_price_per_30m ?: "0").toDouble()
-            (per30 * 2).toInt()
+            // Backend expone 'price' como decimal (string). Es precio por hora.
+            (price ?: "0").toDouble().toInt()
         } catch (_: Throwable) { 0 }
         return SpaceItem(
             id = id,
@@ -81,6 +81,57 @@ class SpaceRepository {
             val list = ApiProvider.space.getAvailable(start, end).map { it.toSpaceItem() }
             Result.success(list)
         } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
+class BookingRepository {
+    suspend fun listMyBookings(): Result<List<BookingListItemDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.booking.listMine()
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun createBooking(
+        spaceId: String,
+        slotStartIso: String,
+        slotEndIso: String,
+        guestCount: Int
+    ): Result<BookingDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.booking.create(
+                CreateBookingRequest(
+                    spaceId = spaceId,
+                    slotStart = slotStartIso,
+                    slotEnd = slotEndIso,
+                    guestCount = guestCount
+                )
+            )
+            Result.success(dto)
+        } catch (t: Throwable) {
+            if (t is HttpException) {
+                val code = t.code()
+                val raw = try { t.response()?.errorBody()?.string().orEmpty() } catch (_: Throwable) { "" }
+                val backendMessage = try {
+                    // Intentar extraer el campo "message" del JSON de error de NestJS
+                    val jsonStart = raw.indexOf('"')
+                    // Fallback simple si no es JSON estándar
+                    if (raw.contains("\"message\"")) {
+                        val key = "\"message\""
+                        val idx = raw.indexOf(key)
+                        if (idx >= 0) raw.substring(idx + key.length).trim() else raw
+                    } else raw
+                } catch (_: Throwable) { raw }
+
+                // Horario ocupado: mapear a mensaje en español para la UI
+                if (code == 400 && backendMessage.contains("Time slot not available", ignoreCase = true)) {
+                    return@withContext Result.failure(IllegalStateException("Esa hora no está disponible. Por favor selecciona otra."))
+                }
+            }
             Result.failure(t)
         }
     }

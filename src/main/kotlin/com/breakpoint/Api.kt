@@ -31,9 +31,21 @@ data class SpaceDto(
     val amenities: List<String>?,
     val accessibility: List<String>?,
     val rules: String?,
-    // TypeORM decimal suele serializarse como string
-    val base_price_per_30m: String?,
+    val price: String?,
     val rating_avg: Double?
+)
+
+// Booking
+data class CreateBookingRequest(
+    val spaceId: String,
+    val slotStart: String,
+    val slotEnd: String,
+    val guestCount: Int
+)
+
+data class BookingDto(
+    val id: String,
+    val status: String
 )
 
 interface AuthApi {
@@ -59,6 +71,11 @@ interface SpaceApi {
         @Query("start") start: String,
         @Query("end") end: String
     ): List<SpaceDto>
+}
+
+interface BookingApi {
+    @POST("booking")
+    suspend fun create(@Body body: CreateBookingRequest): BookingDto
 }
 
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {
@@ -116,6 +133,7 @@ object ApiProvider {
 
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
+    val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
 }
 
 
