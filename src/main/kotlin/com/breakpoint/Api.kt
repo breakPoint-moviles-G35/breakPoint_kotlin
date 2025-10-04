@@ -26,6 +26,7 @@ data class UserDto(
 data class SpaceDto(
     val id: String,
     val title: String,
+    val imageUrl: String?,
     val geo: String?,
     val capacity: Int,
     val amenities: List<String>?,
@@ -76,7 +77,28 @@ interface SpaceApi {
 interface BookingApi {
     @POST("booking")
     suspend fun create(@Body body: CreateBookingRequest): BookingDto
+
+    @GET("booking")
+    suspend fun listMine(): List<BookingListItemDto>
 }
+
+data class BookingListItemDto(
+    val id: String,
+    val status: String,
+    val slotStart: String,
+    val slotEnd: String,
+    val totalAmount: String?,
+    val currency: String?,
+    val space: SpaceSummaryDto?
+)
+
+data class SpaceSummaryDto(
+    val id: String?,
+    val title: String?,
+    val imageUrl: String?,
+    val price: String?,
+    val capacity: Int?
+)
 
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): okhttp3.Response {

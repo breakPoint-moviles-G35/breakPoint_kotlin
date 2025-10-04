@@ -51,6 +51,7 @@ class SpaceRepository {
         return SpaceItem(
             id = id,
             title = title,
+            imageUrl = imageUrl,
             address = geo ?: "",
             hour = "",
             rating = rating_avg ?: 0.0,

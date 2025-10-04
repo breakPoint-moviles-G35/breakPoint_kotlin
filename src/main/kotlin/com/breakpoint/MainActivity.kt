@@ -70,6 +70,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -756,13 +758,25 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(Color(0xFFE0E0E0))
-        )
+        if (!space.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = space.imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(MaterialTheme.shapes.medium),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color(0xFFE0E0E0))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -796,9 +810,9 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
 }
 
 private fun demoSpaces(): List<SpaceItem> = listOf(
-    SpaceItem("1", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("2", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30),
-    SpaceItem("3", "Lorem Ipsum", "XXXX", "XXXX", 4.96, 30)
+    SpaceItem("1", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("2", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30),
+    SpaceItem("3", "Lorem Ipsum", null, "XXXX", "XXXX", 4.96, 30)
 )
 
 @Composable
@@ -912,8 +926,22 @@ private fun BookingCard(booking: BookingListItemDto) {
             modifier = Modifier
                 .size(72.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .background(Color(0xFFE0E0E0))
-        )
+        ) {
+            if (!booking.space?.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = booking.space?.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFE0E0E0))
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
