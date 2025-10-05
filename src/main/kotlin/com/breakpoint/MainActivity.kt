@@ -1,6 +1,14 @@
 package com.breakpoint
 
+import android.content.Intent
 import android.os.Bundle
+import android.nfc.NfcAdapter
+import android.widget.Toast
+import android.view.Gravity
+import android.widget.TextView
+import android.graphics.Color as AndroidColor
+import androidx.core.content.ContextCompat
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -83,6 +91,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -98,10 +111,109 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
+    // Debounce de intents NFC para evitar ejecuciones dobles
+    @Volatile private var lastNfcHandledAtMs: Long = 0L
+    private val minNfcIntervalMs: Long = 1500
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             BreakPointTheme { BreakPointApp() }
+        }
+        // Manejar intent al abrir por NFC
+        handleNfcIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNfcIntent(intent)
+    }
+
+    private fun handleNfcIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val type = intent.type
+        if (action == NfcAdapter.ACTION_NDEF_DISCOVERED && type == "application/vnd.breakpoint.check") {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastNfcHandledAtMs < minNfcIntervalMs) {
+                return
+            }
+            lastNfcHandledAtMs = now
+            showTopToast("NFC detectado")
+            // Ejecutar en el hilo principal
+            CoroutineScope(Dispatchers.Main).launch {
+                // Asegurar token: si no está en memoria, intenta cargarlo desde DataStore
+                var token = ApiProvider.currentToken()
+                if (token.isNullOrBlank()) {
+                    val tm = TokenManager(this@MainActivity)
+                    token = tm.tokenFlow.firstOrNull()
+                    if (!token.isNullOrBlank()) ApiProvider.setToken(token)
+                }
+                // Durante el flujo NFC, no navegues automáticamente por 401
+                ApiProvider.setSuppressUnauthorizedNav(true)
+                val repo = BookingRepository()
+                val active = repo.findActiveNow()
+                active.fold(onSuccess = { list ->
+                    if (list.isEmpty()) {
+                        showTopToast("No tienes una reserva activa ahora")
+                    } else {
+                        // Si hay varias, toma la primera por ahora (mejorar: selector en UI)
+                        val booking = list.first()
+                        // Confirmación con diálogo nativo
+                        val dlg = android.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Checkout")
+                            .setMessage("¿Confirmas checkout de ${booking.space?.title ?: "tu reserva"}?")
+                            .setPositiveButton("Confirmar") { _, _ ->
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    val res = repo.checkout(booking.id)
+                                    res.fold(onSuccess = {
+                                        showTopToast("Checkout exitoso")
+                                    }, onFailure = {
+                                        showTopToast(it.message ?: "Error en checkout")
+                                    })
+                                }
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .create()
+                        dlg.show()
+                    }
+                }, onFailure = {
+                    val msg = it.message ?: "Error consultando reserva"
+                    showTopToast(msg)
+                    if (msg.contains("401") || msg.contains("Unauthorized", ignoreCase = true)) {
+                        showTopToast("Inicia sesión y vuelve a escanear")
+                    }
+                })
+                ApiProvider.setSuppressUnauthorizedNav(false)
+                if (ApiProvider.currentToken().isNullOrBlank()) {
+                    showTopToast("Inicia sesión y vuelve a escanear")
+                }
+            }
+        }
+    }
+
+    private fun showTopToast(message: String) {
+        // Custom toast ubicado arriba; duplicamos para ~5s
+        fun buildToast(): Toast {
+            val toast = Toast(this)
+            toast.duration = Toast.LENGTH_LONG
+            toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 120)
+            val tv = TextView(this)
+            tv.text = message
+            tv.setTextColor(AndroidColor.WHITE)
+            tv.textSize = 16f
+            val bg = ContextCompat.getDrawable(this, R.drawable.toast_bg)
+            tv.background = bg
+            val padH = (24 * resources.displayMetrics.density).toInt()
+            val padV = (12 * resources.displayMetrics.density).toInt()
+            tv.setPadding(padH, padV, padH, padV)
+            toast.view = tv
+            return toast
+        }
+        buildToast().show()
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(3600)
+            buildToast().apply { duration = Toast.LENGTH_SHORT }.show()
         }
     }
 }
@@ -130,8 +242,15 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 @Composable
 fun BreakPointApp() {
     val navController = rememberNavController()
-    // 401 handler: vuelve al login limpiando back stack
+    // 401 handler: limpia token y vuelve al login
+    val ctxUnauthorized = LocalContext.current
+    val tmUnauthorized = remember { TokenManager(ctxUnauthorized) }
+    val scopeUnauthorized = rememberCoroutineScope()
     ApiProvider.setOnUnauthorized {
+        scopeUnauthorized.launch {
+            tmUnauthorized.clear()
+            ApiProvider.setToken(null)
+        }
         navController.navigate(Destinations.Login.route) {
             popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
             launchSingleTop = true
@@ -158,9 +277,42 @@ fun BreakPointApp() {
         }
         NavHost(
             navController = navController,
-            startDestination = Destinations.Login.route,
+            startDestination = Destinations.Splash.route,
             modifier = Modifier.padding(padding)
         ) {
+            composable(Destinations.Splash.route) {
+                val ctx = LocalContext.current
+                val tokenManager = remember { TokenManager(ctx) }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    val token = tokenManager.tokenFlow.firstOrNull()
+                    if (!token.isNullOrBlank()) {
+                        ApiProvider.setToken(token)
+                        // Validar token llamando al backend
+                        val repo = AuthRepository()
+                        val res = repo.profile()
+                        res.fold(onSuccess = {
+                            navController.navigate(Destinations.Explore.route) {
+                                popUpTo(Destinations.Splash.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }, onFailure = {
+                            tokenManager.clear()
+                            ApiProvider.setToken(null)
+                            navController.navigate(Destinations.Login.route) {
+                                popUpTo(Destinations.Splash.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        })
+                    } else {
+                        navController.navigate(Destinations.Login.route) {
+                            popUpTo(Destinations.Splash.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+                // UI simple de carga
+                SimpleCenter(text = "Cargando…")
+            }
             composable(Destinations.Login.route) {
                 LoginScreen(
                     onLoginSuccess = {
@@ -188,6 +340,7 @@ fun BreakPointApp() {
 }
 
 sealed class Destinations(val route: String, val label: String) {
+    data object Splash : Destinations("splash", "Splash")
     data object Login : Destinations("login", "Login")
     data object Explore : Destinations("explore", "Explore")
     data object Rate : Destinations("rate", "Rate")
@@ -235,7 +388,8 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.Reservations,
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
-                        Destinations.Login -> Icons.Default.Star
+                        Destinations.Login,
+                        Destinations.Splash -> Icons.Default.Star
                     }
                     Icon(imageVector = icon, contentDescription = destination.label)
                 },
