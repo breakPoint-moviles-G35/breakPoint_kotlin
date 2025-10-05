@@ -83,6 +83,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.tasks.await
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
+import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -710,6 +723,63 @@ fun ExploreScreen(navController: NavHostController) {
     var showHourPicker by remember { mutableStateOf(false) }
     var startHour by remember { mutableStateOf<Int?>(null) }
     var endHour by remember { mutableStateOf<Int?>(null) }
+    val context = LocalContext.current
+    var showMap by remember { mutableStateOf(false) }
+    var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    val parseLatLng: (String) -> LatLng? = { text ->
+        val regex = Regex("-?\\d+(?:\\.\\d+)?")
+        val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
+        if (nums.size < 2) null else {
+            val a = nums[0]
+            val b = nums[1]
+            val lat: Double
+            val lng: Double
+            if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+            LatLng(lat, lng)
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val granted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (!granted) {
+            loading = false
+            error = "Permiso de ubicación denegado"
+        } else {
+            val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            coroutineScope.launch {
+                try {
+                    val location = fused.lastLocation.await()
+                    if (location == null) {
+                        loading = false
+                        error = "No se pudo obtener ubicación"
+                    } else {
+                        val lat = location.latitude
+                        val lng = location.longitude
+                        val withDistance = items.map { s ->
+                            val parts = s.address.split(",")
+                            val maybeLat = parts.getOrNull(0)?.toDoubleOrNull()
+                            val maybeLng = parts.getOrNull(1)?.toDoubleOrNull()
+                            val d = if (maybeLat != null && maybeLng != null) {
+                                val dLat = Math.toRadians(maybeLat - lat)
+                                val dLng = Math.toRadians(maybeLng - lng)
+                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(maybeLat))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                                val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                                6371.0 * c
+                            } else Double.MAX_VALUE
+                            s to d
+                        }
+                        filtered = withDistance.sortedBy { it.second }.map { it.first }
+                        loading = false
+                    }
+                } catch (t: Throwable) {
+                    loading = false
+                    error = t.message ?: "Error ubicando"
+                }
+            }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -755,44 +825,61 @@ fun ExploreScreen(navController: NavHostController) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
             }
-            // Sort selector
+            // Botón: calcular cercanos y ETA caminando
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 shadowElevation = 8.dp,
                 tonalElevation = 0.dp
             ) {
-                var expanded by remember { mutableStateOf(false) }
-                var sort by remember { mutableStateOf("Relevancia") }
                 Box(
                     modifier = Modifier
                         .clip(MaterialTheme.shapes.extraLarge)
                         .background(Color.White)
-                        .clickable { expanded = true }
+                        .clickable {
+                            coroutineScope.launch {
+                                error = null
+                                loading = true
+                                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                try {
+                                    // Runtime permission check
+                                    val pm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                                    val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                                    if (pm != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                                        permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                        return@launch
+                                    }
+                                    val location = fused.lastLocation.await()
+                                    if (location == null) {
+                                        loading = false
+                                        error = "No se pudo obtener ubicación"
+                                    } else {
+                                        val lat = location.latitude
+                                        val lng = location.longitude
+                                        userLatLng = LatLng(lat, lng)
+                                        // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
+                                        val withDistance = items.map { s ->
+                                            val ll = parseLatLng(s.address)
+                                            val d = if (ll != null) {
+                                                val dLat = Math.toRadians(ll.latitude - lat)
+                                                val dLng = Math.toRadians(ll.longitude - lng)
+                                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                                                val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                                                6371.0 * c // km
+                                            } else Double.MAX_VALUE
+                                            s to d
+                                        }
+                                        filtered = withDistance.sortedBy { it.second }.map { it.first }
+                                        showMap = true
+                                        loading = false
+                                    }
+                                } catch (t: Throwable) {
+                                    loading = false
+                                    error = t.message ?: "Error ubicando"
+                                }
+                            }
+                        }
                         .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) { Text(sort) }
-                androidx.compose.material3.DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("Relevancia") }, onClick = {
-                        expanded = false; sort = "Relevancia"
-                        coroutineScope.launch {
-                            loading = true; error = null
-                            val result = repo.getSpaces()
-                            loading = false
-                            result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
-                        }
-                    })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("Precio") }, onClick = {
-                        expanded = false; sort = "Precio"
-                        coroutineScope.launch {
-                            loading = true; error = null
-                            val result = repo.getSpacesSorted()
-                            loading = false
-                            result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
-                        }
-                    })
-                }
+                ) { Text("Cerca de mí") }
             }
         }
 
@@ -821,8 +908,24 @@ fun ExploreScreen(navController: NavHostController) {
                     }
                 }) { Text("Reintentar") }
             }
+        } else if (showMap) {
+            val firstLatLng = filtered.firstOrNull()?.let { parseLatLng(it.address) }
+            val center = firstLatLng ?: userLatLng ?: LatLng(4.65, -74.1)
+            val cameraState = rememberCameraPositionState {
+                position = CameraPosition.fromLatLngZoom(center, 12f)
+            }
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraState
+            ) {
+                userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
+                filtered.forEach { s ->
+                    parseLatLng(s.address)?.let { ll ->
+                        Marker(state = MarkerState(position = ll), title = s.title)
+                    }
+                }
+            }
         } else {
-            // List with simple pull-to-refresh via reload button on top (Compose foundation SwipeRefresh is in accompanist; avoid extra deps)
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
