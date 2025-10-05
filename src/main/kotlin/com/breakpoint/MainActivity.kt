@@ -259,6 +259,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var success by remember { mutableStateOf<String?>(null) }
     var showPassword by remember { mutableStateOf(false) }
     var showConfirm by remember { mutableStateOf(false) }
+    
+    // Estados de validación
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmError by remember { mutableStateOf<String?>(null) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    
     val repo = remember { AuthRepository() }
     val ctx = LocalContext.current
     val tokenManager = remember(ctx) { TokenManager(ctx) }
@@ -269,6 +276,52 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val usernameRequester = remember { FocusRequester() }
     val passwordRequester = remember { FocusRequester() }
     val confirmRequester = remember { FocusRequester() }
+
+    // Funciones de validación
+    fun validateEmail(email: String): String? {
+        if (email.isBlank()) return "Email es requerido"
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            return "Email inválido"
+        }
+        if (!email.lowercase().endsWith("@uniandes.edu.co")) {
+            return "Email debe ser @uniandes.edu.co"
+        }
+        return null
+    }
+
+    fun validatePassword(password: String): String? {
+        if (password.isBlank()) return "Contraseña es requerida"
+        if (password.trim().isEmpty()) return "La contraseña no puede ser vacía"
+        if (password.length < 6) return "Contraseña mínimo 6 caracteres"
+        return null
+    }
+
+    fun validateConfirmPassword(password: String, confirm: String): String? {
+        if (confirm.isBlank()) return "Confirmar contraseña es requerido"
+        if (password != confirm) return "Las contraseñas no coinciden"
+        return null
+    }
+
+    fun validateName(name: String): String? {
+        if (name.isNotBlank() && name.trim().isEmpty()) {
+            return "Nombre no puede ser vacío"
+        }
+        return null
+    }
+
+    fun validateForm(): Boolean {
+        val emailErr = validateEmail(username)
+        val passwordErr = validatePassword(password)
+        val confirmErr = if (isRegister) validateConfirmPassword(password, confirm) else null
+        val nameErr = if (isRegister) validateName(name) else null
+        
+        emailError = emailErr
+        passwordError = passwordErr
+        confirmError = confirmErr
+        nameError = nameErr
+        
+        return emailErr == null && passwordErr == null && confirmErr == null && nameErr == null
+    }
 
     Column(
         modifier = Modifier
@@ -300,14 +353,32 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.extraLarge)
                             .background(if (!isRegister) MaterialTheme.colorScheme.primary else Color.White)
-                            .clickable { isRegister = false }
+                            .clickable { 
+                                isRegister = false
+                                // Limpiar errores al cambiar modo
+                                error = null
+                                success = null
+                                emailError = null
+                                passwordError = null
+                                confirmError = null
+                                nameError = null
+                            }
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) { Text("Login", color = if (!isRegister) MaterialTheme.colorScheme.onPrimary else Color.Black) }
                     Box(
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.extraLarge)
                             .background(if (isRegister) MaterialTheme.colorScheme.primary else Color.White)
-                            .clickable { isRegister = true }
+                            .clickable { 
+                                isRegister = true
+                                // Limpiar errores al cambiar modo
+                                error = null
+                                success = null
+                                emailError = null
+                                passwordError = null
+                                confirmError = null
+                                nameError = null
+                            }
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) { Text("Register", color = if (isRegister) MaterialTheme.colorScheme.onPrimary else Color.Black) }
                 }
@@ -336,7 +407,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             ) {
                 TextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { 
+                        name = it
+                        nameError = validateName(it)
+                    },
                     singleLine = true,
                     placeholder = { Text("Tu nombre") },
                     modifier = Modifier
@@ -351,9 +425,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         unfocusedContainerColor = Color.White,
                         disabledContainerColor = Color.White,
                         focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedIndicatorColor = Color.Transparent,
+                        errorContainerColor = Color.White,
+                        errorIndicatorColor = Color.Red
                     ),
-                    shape = MaterialTheme.shapes.extraLarge
+                    shape = MaterialTheme.shapes.extraLarge,
+                    isError = nameError != null,
+                    supportingText = nameError?.let { { Text(it, color = Color.Red) } }
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -393,7 +471,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        Text(text = stringResource(id = R.string.login_username_label))
+        Text(text = "Email")
         Spacer(modifier = Modifier.height(6.dp))
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
@@ -403,14 +481,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         ) {
             TextField(
                 value = username,
-                onValueChange = { username = it },
+                onValueChange = { 
+                    username = it
+                    emailError = validateEmail(it)
+                },
                 singleLine = true,
-                placeholder = { Text(stringResource(id = R.string.login_username_placeholder)) },
+                placeholder = { Text("tu.email@uniandes.edu.co") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(usernameRequester),
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
+                    keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
                 ),
                 keyboardActions = KeyboardActions(
@@ -421,14 +502,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     unfocusedContainerColor = Color.White,
                     disabledContainerColor = Color.White,
                     focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
+                    unfocusedIndicatorColor = Color.Transparent,
+                    errorContainerColor = Color.White,
+                    errorIndicatorColor = Color.Red
                 ),
-                shape = MaterialTheme.shapes.extraLarge
+                shape = MaterialTheme.shapes.extraLarge,
+                isError = emailError != null,
+                supportingText = emailError?.let { { Text(it, color = Color.Red) } }
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = stringResource(id = R.string.login_password_label))
+        Text(text = "Contraseña")
         Spacer(modifier = Modifier.height(6.dp))
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
@@ -438,9 +523,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         ) {
             TextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    passwordError = validatePassword(it)
+                    // Si estamos en modo registro, también validar confirmación
+                    if (isRegister && confirm.isNotBlank()) {
+                        confirmError = validateConfirmPassword(it, confirm)
+                    }
+                },
                 singleLine = true,
-                placeholder = { Text(stringResource(id = R.string.login_password_placeholder)) },
+                placeholder = { Text("Mínimo 6 caracteres") },
                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
@@ -450,9 +542,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     onNext = { if (isRegister) confirmRequester.requestFocus() },
                     onDone = {
                         if (!isRegister) {
-                            error = null
-                            success = null
-                            loading = true
+                            if (validateForm()) {
+                                error = null
+                                success = null
+                                loading = true
+                            }
                         }
                     }
                 ),
@@ -470,9 +564,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     unfocusedContainerColor = Color.White,
                     disabledContainerColor = Color.White,
                     focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
+                    unfocusedIndicatorColor = Color.Transparent,
+                    errorContainerColor = Color.White,
+                    errorIndicatorColor = Color.Red
                 ),
-                shape = MaterialTheme.shapes.extraLarge
+                shape = MaterialTheme.shapes.extraLarge,
+                isError = passwordError != null,
+                supportingText = passwordError?.let { { Text(it, color = Color.Red) } }
             )
         }
 
@@ -488,7 +586,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             ) {
                 TextField(
                     value = confirm,
-                    onValueChange = { confirm = it },
+                    onValueChange = { 
+                        confirm = it
+                        confirmError = validateConfirmPassword(password, it)
+                    },
                     singleLine = true,
                     placeholder = { Text("Repite tu contraseña") },
                     visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
@@ -498,9 +599,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
-                            error = null
-                            success = null
-                            loading = true
+                            if (validateForm()) {
+                                error = null
+                                success = null
+                                loading = true
+                            }
                         }
                     ),
                     trailingIcon = {
@@ -517,9 +620,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         unfocusedContainerColor = Color.White,
                         disabledContainerColor = Color.White,
                         focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedIndicatorColor = Color.Transparent,
+                        errorContainerColor = Color.White,
+                        errorIndicatorColor = Color.Red
                     ),
-                    shape = MaterialTheme.shapes.extraLarge
+                    shape = MaterialTheme.shapes.extraLarge,
+                    isError = confirmError != null,
+                    supportingText = confirmError?.let { { Text(it, color = Color.Red) } }
                 )
             }
         }
@@ -529,16 +636,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Button(
             onClick = {
                 if (loading) return@Button
+                
+                // Validar formulario antes de enviar
+                if (!validateForm()) {
+                    return@Button
+                }
+                
                 error = null
                 success = null
                 loading = true
                 coroutineScope.launch {
                     val result = if (isRegister) {
-                        if (password != confirm) {
-                            loading = false
-                            error = "Las contraseñas no coinciden"
-                            return@launch
-                        }
                         repo.register(username, password, name.ifBlank { null }, selectedRole)
                     } else {
                         repo.login(username, password)
@@ -560,7 +668,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 onLoginSuccess()
                             }
                         },
-                        onFailure = { error = it.message ?: if (isRegister) "Registro fallido" else "Login fallido" }
+                        onFailure = { 
+                            val errorMessage = when {
+                                it.message?.contains("Credenciales inválidas") == true -> "Email o contraseña incorrectos"
+                                it.message?.contains("El correo ya está registrado") == true -> "Este email ya está registrado"
+                                it.message?.contains("Email debe ser con @uniandes.edu.co") == true -> "Email debe ser @uniandes.edu.co"
+                                it.message?.contains("La contraseña no puede ser vacía") == true -> "La contraseña no puede ser vacía"
+                                else -> it.message ?: if (isRegister) "Error en el registro" else "Error en el login"
+                            }
+                            error = errorMessage
+                        }
                     )
                     loading = false
                 }
@@ -573,7 +690,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ),
             shape = MaterialTheme.shapes.extraLarge,
-            enabled = if (isRegister) username.isNotBlank() && password.isNotBlank() && confirm.isNotBlank() && !loading else username.isNotBlank() && password.isNotBlank() && !loading
+            enabled = !loading && emailError == null && passwordError == null && confirmError == null && nameError == null && username.isNotBlank() && password.isNotBlank() && (!isRegister || confirm.isNotBlank())
         ) {
             val label = if (isRegister) "Crear cuenta" else stringResource(id = R.string.login_button)
             Text(text = if (loading) "Procesando..." else label, fontWeight = FontWeight.SemiBold)
