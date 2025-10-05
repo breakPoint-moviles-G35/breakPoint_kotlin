@@ -1,14 +1,27 @@
 -- Merging decision tree log ---
+meta-data#com.google.android.geo.API_KEY
+INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:13:9-15:47
+	android:value
+		INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:15:13-44
+	android:name
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:14:13-58
 manifest
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-23:12
-INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-23:12
-INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-23:12
-INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-23:12
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-28:12
+INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:1-28:12
+MERGED from [com.google.maps.android:maps-compose:4.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/c3d5c4fc14ae5546ee6613d7a4efaab2/transformed/jetified-maps-compose-4.3.0/AndroidManifest.xml:17:1-22:12
+MERGED from [com.google.android.gms:play-services-location:21.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/acc4cec669f15d6184a708bc657e3156/transformed/jetified-play-services-location-21.3.0/AndroidManifest.xml:2:1-8:12
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bee763a35b2324689998b9d1e576b25/transformed/jetified-maps-ktx-5.0.0/AndroidManifest.xml:18:1-23:12
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:17:1-44:12
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.navigation:navigation-common:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/37ddaf00f1739acb16ed95ac15c4a568/transformed/navigation-common-2.7.7/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/1b5374c6ff8a2fdd6edf2e473e453153/transformed/navigation-runtime-2.7.7/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/402def660a9cc49acf23c0aa37673500/transformed/navigation-common-ktx-2.7.7/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/8a2c96c70c443679297466d3599897f4/transformed/navigation-runtime-ktx-2.7.7/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.navigation:navigation-compose:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/4fcfd2a34428a15595c31716b0327818/transformed/jetified-navigation-compose-2.7.7/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8420daebbfb7afffae04cf6aeb97d9f1/transformed/fragment-1.1.0/AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.activity:activity:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/f57c664a0adb7671b500b7d69447a083/transformed/jetified-activity-1.8.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.activity:activity-ktx:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/5c9fa5015dff6f522ac734569545e59f/transformed/jetified-activity-ktx-1.8.2/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material3:material3-android:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/023da416edfdf8de07b124869ce76a33/transformed/jetified-material3-release/AndroidManifest.xml:17:1-22:12
@@ -16,10 +29,10 @@ MERGED from [androidx.compose.material:material-android:1.6.6] /Users/alejocatan
 MERGED from [androidx.compose.material:material-icons-core-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/ec4971a93275d831c10f1209942a94d1/transformed/jetified-material-icons-core-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material:material-icons-extended-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/a8a2d0e12c64fb9826675448ffb7d1c1/transformed/jetified-material-icons-extended-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material:material-ripple-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/55a0d2670e1e0aba1e7983358a094e0f/transformed/jetified-material-ripple-release/AndroidManifest.xml:2:1-7:12
-MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:2:1-7:12
-MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.animation:animation-core-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/af01738480fa3d81bb9fb13771975e6f/transformed/jetified-animation-core-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.animation:animation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e9efad470d9c9278b9881c157737d285/transformed/jetified-animation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.ui:ui-tooling-data-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e6074415f783b5dac6657994972a38c2/transformed/jetified-ui-tooling-data-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.ui:ui-unit-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/a0ce843c1a34854035eb19297e6b2390/transformed/jetified-ui-unit-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.ui:ui-geometry-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/dd1b24b821cf567bc8798e649e8ec5bf/transformed/jetified-ui-geometry-release/AndroidManifest.xml:2:1-7:12
@@ -32,8 +45,10 @@ MERGED from [androidx.compose.ui:ui-tooling-android:1.6.6] /Users/alejocatano02/
 MERGED from [androidx.activity:activity-compose:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/9277c6c973fe9e1246f5fd20d7913b0e/transformed/jetified-activity-compose-1.8.2/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/1772b13171af6fad86b4fefa2ca3cc6f/transformed/jetified-savedstate-ktx-1.2.1/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/857f784860ae01b927a7d115b29b06d6/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/d81db8a283177e20dc5489013b099026/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/59a05c637f4223ee191fd48569181228/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:17:1-35:12
 MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/ab65208e3ce40f81b3a4608d0ce270e3/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/1e4c77a98fd03eecb07e7142aa561517/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/6abdbc53f222b6aff99439dd1264e594/transformed/jetified-lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/1d8ef676cb5a774a2fa24c70a4a50703/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:17:1-22:12
@@ -42,18 +57,23 @@ MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /Users/alejocatano02/.g
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/36ae972a9cfff5465ea6d8aa8cc8c55a/transformed/jetified-lifecycle-viewmodel-ktx-2.6.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/4f049a8822ba1654b5c224183704b0aa/transformed/jetified-lifecycle-viewmodel-compose-2.6.2/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.compose.ui:ui-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/07d0e6581d0d5ed50e88e7cf7b8640da/transformed/jetified-ui-release/AndroidManifest.xml:2:1-7:12
-MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:17:1-24:12
-MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:17:1-30:12
-MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
-MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.datastore:datastore-core-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/ecc73ff96ea15a03cac4b8d769f5436c/transformed/jetified-datastore-core-release/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.datastore:datastore-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/647ff068b160d5a44a2a26356b4b70c7/transformed/jetified-datastore-release/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/7241c88c9f5b59e7b7a4475587c97055/transformed/jetified-datastore-preferences-release/AndroidManifest.xml:17:1-22:12
-MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:2:1-7:12
-MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/21014512ba032ba536eaa74560c074fc/transformed/jetified-play-services-tasks-18.2.0/AndroidManifest.xml:2:1-5:12
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:2:1-9:12
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/52e2b9faee1a745e8dd7edaae74652b5/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f3ec4d0cab436a3a9d81267151e4eaab/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4f32ab5dbd4eabc8442081cfca9887fe/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/505c43e2a499a54fef8211997177c655/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
 MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8d334fa7f94d0535d596d5f2c0aa7a5f/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.databinding:viewbinding:7.4.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/b90ed7c64c1b4c23e1997d4c677766c7/transformed/jetified-viewbinding-7.4.2/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/fb1a450e0a6f9bf47d38aeca77307eb5/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:17:1-55:12
 MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/a44065294917a466f865c5ea6ec35cce/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
 MERGED from [androidx.tracing:tracing:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/d3287fba5372178aafb1ab5b812f65c1/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:17:1-24:12
@@ -68,11 +88,27 @@ MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/alejocatano02/.gradle
 		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:2:11-69
 uses-permission#android.permission.INTERNET
 ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:3:5-67
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:24:5-67
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:24:5-67
 	android:name
 		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:3:22-64
+uses-permission#android.permission.ACCESS_FINE_LOCATION
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:4:5-79
+	android:name
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:4:22-76
+uses-permission#android.permission.ACCESS_COARSE_LOCATION
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:5:5-81
+	android:name
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:5:22-78
 application
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:5:5-21:19
-INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:5:5-21:19
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:7:5-26:19
+INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:7:5-26:19
+MERGED from [com.google.android.gms:play-services-location:21.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/acc4cec669f15d6184a708bc657e3156/transformed/jetified-play-services-location-21.3.0/AndroidManifest.xml:6:5-20
+MERGED from [com.google.android.gms:play-services-location:21.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/acc4cec669f15d6184a708bc657e3156/transformed/jetified-play-services-location-21.3.0/AndroidManifest.xml:6:5-20
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:36:5-42:19
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:36:5-42:19
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:4:5-6:19
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:4:5-6:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/22fab704fcb4a0e81e2c770bc1830fb9/transformed/jetified-ui-test-manifest-1.6.6/AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/22fab704fcb4a0e81e2c770bc1830fb9/transformed/jetified-ui-test-manifest-1.6.6/AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/1ba1102078fe7432ba86f77d2d8dec1e/transformed/jetified-ui-tooling-release/AndroidManifest.xml:22:5-26:19
@@ -81,6 +117,10 @@ MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/alejocatano02/.gradle/caches/8
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/59a05c637f4223ee191fd48569181228/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/21014512ba032ba536eaa74560c074fc/transformed/jetified-play-services-tasks-18.2.0/AndroidManifest.xml:4:5-20
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/21014512ba032ba536eaa74560c074fc/transformed/jetified-play-services-tasks-18.2.0/AndroidManifest.xml:4:5-20
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:5:5-7:19
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:5:5-7:19
 MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
 MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/505c43e2a499a54fef8211997177c655/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
@@ -94,35 +134,45 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/alejocatano02/.gradl
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:9:9-35
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:11:9-35
 	android:label
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:6:9-41
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:8:9-41
 	android:icon
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:7:9-43
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:9:9-43
 	android:allowBackup
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:8:9-35
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:10:9-35
 	android:networkSecurityConfig
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:10:9-69
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:12:9-69
 activity#com.breakpoint.MainActivity
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:12:9-19:20
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:17:9-24:20
 	android:exported
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:14:13-36
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:19:13-36
 	android:name
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:13:13-55
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:18:13-55
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:15:13-18:29
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:20:13-23:29
 action#android.intent.action.MAIN
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:16:17-69
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:21:17-69
 	android:name
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:16:25-66
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:21:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:17:17-77
+ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:22:17-77
 	android:name
-		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:17:27-74
+		ADDED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml:22:27-74
 uses-sdk
 INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml
 INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml
+MERGED from [com.google.maps.android:maps-compose:4.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/c3d5c4fc14ae5546ee6613d7a4efaab2/transformed/jetified-maps-compose-4.3.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.maps.android:maps-compose:4.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/c3d5c4fc14ae5546ee6613d7a4efaab2/transformed/jetified-maps-compose-4.3.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.gms:play-services-location:21.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/acc4cec669f15d6184a708bc657e3156/transformed/jetified-play-services-location-21.3.0/AndroidManifest.xml:4:5-44
+MERGED from [com.google.android.gms:play-services-location:21.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/acc4cec669f15d6184a708bc657e3156/transformed/jetified-play-services-location-21.3.0/AndroidManifest.xml:4:5-44
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bee763a35b2324689998b9d1e576b25/transformed/jetified-maps-ktx-5.0.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bee763a35b2324689998b9d1e576b25/transformed/jetified-maps-ktx-5.0.0/AndroidManifest.xml:21:5-44
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:3:5-44
 MERGED from [androidx.navigation:navigation-common:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/37ddaf00f1739acb16ed95ac15c4a568/transformed/navigation-common-2.7.7/AndroidManifest.xml:20:5-44
 MERGED from [androidx.navigation:navigation-common:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/37ddaf00f1739acb16ed95ac15c4a568/transformed/navigation-common-2.7.7/AndroidManifest.xml:20:5-44
 MERGED from [androidx.navigation:navigation-runtime:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/1b5374c6ff8a2fdd6edf2e473e453153/transformed/navigation-runtime-2.7.7/AndroidManifest.xml:20:5-44
@@ -133,6 +183,8 @@ MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.7] /Users/alejocatan
 MERGED from [androidx.navigation:navigation-runtime-ktx:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/8a2c96c70c443679297466d3599897f4/transformed/navigation-runtime-ktx-2.7.7/AndroidManifest.xml:5:5-44
 MERGED from [androidx.navigation:navigation-compose:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/4fcfd2a34428a15595c31716b0327818/transformed/jetified-navigation-compose-2.7.7/AndroidManifest.xml:5:5-44
 MERGED from [androidx.navigation:navigation-compose:2.7.7] /Users/alejocatano02/.gradle/caches/8.14/transforms/4fcfd2a34428a15595c31716b0327818/transformed/jetified-navigation-compose-2.7.7/AndroidManifest.xml:5:5-44
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8420daebbfb7afffae04cf6aeb97d9f1/transformed/fragment-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.1.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8420daebbfb7afffae04cf6aeb97d9f1/transformed/fragment-1.1.0/AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.activity:activity:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/f57c664a0adb7671b500b7d69447a083/transformed/jetified-activity-1.8.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.activity:activity:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/f57c664a0adb7671b500b7d69447a083/transformed/jetified-activity-1.8.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.activity:activity-ktx:1.8.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/5c9fa5015dff6f522ac734569545e59f/transformed/jetified-activity-ktx-1.8.2/AndroidManifest.xml:5:5-44
@@ -147,14 +199,14 @@ MERGED from [androidx.compose.material:material-icons-extended-android:1.6.6] /U
 MERGED from [androidx.compose.material:material-icons-extended-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/a8a2d0e12c64fb9826675448ffb7d1c1/transformed/jetified-material-icons-extended-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.material:material-ripple-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/55a0d2670e1e0aba1e7983358a094e0f/transformed/jetified-material-ripple-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.material:material-ripple-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/55a0d2670e1e0aba1e7983358a094e0f/transformed/jetified-material-ripple-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.animation:animation-core-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/af01738480fa3d81bb9fb13771975e6f/transformed/jetified-animation-core-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.animation:animation-core-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/af01738480fa3d81bb9fb13771975e6f/transformed/jetified-animation-core-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.animation:animation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e9efad470d9c9278b9881c157737d285/transformed/jetified-animation-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.animation:animation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e9efad470d9c9278b9881c157737d285/transformed/jetified-animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c32ff0995b491d467d3cad8fda897a19/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/0fea02f4f0de30754527016c109aefb6/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.ui:ui-tooling-data-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e6074415f783b5dac6657994972a38c2/transformed/jetified-ui-tooling-data-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.ui:ui-tooling-data-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/e6074415f783b5dac6657994972a38c2/transformed/jetified-ui-tooling-data-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.ui:ui-unit-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/a0ce843c1a34854035eb19297e6b2390/transformed/jetified-ui-unit-release/AndroidManifest.xml:5:5-44
@@ -179,10 +231,14 @@ MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/alejocatano02/.gra
 MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/1772b13171af6fad86b4fefa2ca3cc6f/transformed/jetified-savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
 MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/857f784860ae01b927a7d115b29b06d6/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:20:5-44
 MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/857f784860ae01b927a7d115b29b06d6/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/d81db8a283177e20dc5489013b099026/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/d81db8a283177e20dc5489013b099026/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/59a05c637f4223ee191fd48569181228/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:21:5-44
 MERGED from [androidx.emoji2:emoji2:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/59a05c637f4223ee191fd48569181228/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:21:5-44
 MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
 MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/ab65208e3ce40f81b3a4608d0ce270e3/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/ab65208e3ce40f81b3a4608d0ce270e3/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/1e4c77a98fd03eecb07e7142aa561517/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/1e4c77a98fd03eecb07e7142aa561517/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/6abdbc53f222b6aff99439dd1264e594/transformed/jetified-lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:20:5-44
@@ -199,30 +255,40 @@ MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /Users/alejoc
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/4f049a8822ba1654b5c224183704b0aa/transformed/jetified-lifecycle-viewmodel-compose-2.6.2/AndroidManifest.xml:20:5-44
 MERGED from [androidx.compose.ui:ui-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/07d0e6581d0d5ed50e88e7cf7b8640da/transformed/jetified-ui-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.ui:ui-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/07d0e6581d0d5ed50e88e7cf7b8640da/transformed/jetified-ui-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
-MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
-MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
-MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
-MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
-MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
-MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
-MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.datastore:datastore-core-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/ecc73ff96ea15a03cac4b8d769f5436c/transformed/jetified-datastore-core-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.datastore:datastore-core-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/ecc73ff96ea15a03cac4b8d769f5436c/transformed/jetified-datastore-core-release/AndroidManifest.xml:5:5-44
 MERGED from [androidx.datastore:datastore-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/647ff068b160d5a44a2a26356b4b70c7/transformed/jetified-datastore-release/AndroidManifest.xml:20:5-44
 MERGED from [androidx.datastore:datastore-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/647ff068b160d5a44a2a26356b4b70c7/transformed/jetified-datastore-release/AndroidManifest.xml:20:5-44
 MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/7241c88c9f5b59e7b7a4475587c97055/transformed/jetified-datastore-preferences-release/AndroidManifest.xml:20:5-44
 MERGED from [androidx.datastore:datastore-preferences-android:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/7241c88c9f5b59e7b7a4475587c97055/transformed/jetified-datastore-preferences-release/AndroidManifest.xml:20:5-44
-MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.runtime:runtime-saveable-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/c513c3bab496b14120609a5376426aa4/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
-MERGED from [androidx.compose.runtime:runtime-android:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/7be57b44fcea09e41c72876c2831c00b/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/21014512ba032ba536eaa74560c074fc/transformed/jetified-play-services-tasks-18.2.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-tasks:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/21014512ba032ba536eaa74560c074fc/transformed/jetified-play-services-tasks-18.2.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:3:5-44
+MERGED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:3:5-44
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.autofill:autofill:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f61590b25b1609c878167563aeeb9f6d/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/52e2b9faee1a745e8dd7edaae74652b5/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/52e2b9faee1a745e8dd7edaae74652b5/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f3ec4d0cab436a3a9d81267151e4eaab/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/f3ec4d0cab436a3a9d81267151e4eaab/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/54d90978e57a06b100921657bce44887/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/028057e482696a275768c0e066330f72/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4f32ab5dbd4eabc8442081cfca9887fe/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4f32ab5dbd4eabc8442081cfca9887fe/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/505c43e2a499a54fef8211997177c655/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/505c43e2a499a54fef8211997177c655/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8d334fa7f94d0535d596d5f2c0aa7a5f/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
 MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/8d334fa7f94d0535d596d5f2c0aa7a5f/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.databinding:viewbinding:7.4.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/b90ed7c64c1b4c23e1997d4c677766c7/transformed/jetified-viewbinding-7.4.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.databinding:viewbinding:7.4.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/b90ed7c64c1b4c23e1997d4c677766c7/transformed/jetified-viewbinding-7.4.2/AndroidManifest.xml:5:5-44
 MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/fb1a450e0a6f9bf47d38aeca77307eb5/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:21:5-44
 MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/fb1a450e0a6f9bf47d38aeca77307eb5/transformed/jetified-profileinstaller-1.3.0/AndroidManifest.xml:21:5-44
 MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/alejocatano02/.gradle/caches/8.14/transforms/a44065294917a466f865c5ea6ec35cce/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
@@ -235,6 +301,36 @@ MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/alejocatano02/.gradle
 		INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml
 	android:minSdkVersion
 		INJECTED from /Users/alejocatano02/Documents/Univesidad/Semestre 2025-2/Moviles /Aplicacion/App/src/main/AndroidManifest.xml
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:23:5-79
+	android:name
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:23:22-76
+uses-feature#0x00020000
+ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:26:5-28:35
+	android:glEsVersion
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:27:9-41
+	android:required
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:28:9-32
+queries
+ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:30:5-34:15
+package#com.google.android.apps.maps
+ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:33:9-64
+	android:name
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:33:18-61
+uses-library#org.apache.http.legacy
+ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:39:9-41:40
+	android:required
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:41:13-37
+	android:name
+		ADDED from [com.google.android.gms:play-services-maps:18.2.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/ae5cc455db5f282143aef3a488a2d810/transformed/jetified-play-services-maps-18.2.0/AndroidManifest.xml:40:13-50
+activity#com.google.android.gms.common.api.GoogleApiActivity
+ADDED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:5:9-173
+	android:exported
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:5:146-170
+	android:theme
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:5:86-145
+	android:name
+		ADDED from [com.google.android.gms:play-services-base:18.5.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/0ba885e2c56c31d6b1b2cf2cb936c1a6/transformed/jetified-play-services-base-18.5.0/AndroidManifest.xml:5:19-85
 activity#androidx.activity.ComponentActivity
 ADDED from [androidx.compose.ui:ui-test-manifest:1.6.6] /Users/alejocatano02/.gradle/caches/8.14/transforms/22fab704fcb4a0e81e2c770bc1830fb9/transformed/jetified-ui-test-manifest-1.6.6/AndroidManifest.xml:23:9-25:39
 	android:exported
@@ -275,6 +371,12 @@ ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gr
 		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:31:17-49
 	android:name
 		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/alejocatano02/.gradle/caches/8.14/transforms/579ceddb14e2dd47936f76fbec519e2f/transformed/jetified-lifecycle-process-2.6.2/AndroidManifest.xml:30:17-78
+meta-data#com.google.android.gms.version
+ADDED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:6:9-122
+	android:value
+		ADDED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:6:66-119
+	android:name
+		ADDED from [com.google.android.gms:play-services-basement:18.4.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/b66e6c28f6126a17f92e7e6c90643bac/transformed/jetified-play-services-basement-18.4.0/AndroidManifest.xml:6:20-65
 permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 ADDED from [androidx.core:core:1.12.0] /Users/alejocatano02/.gradle/caches/8.14/transforms/4bf6ce96844612108e5242d3299a4022/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
 	android:protectionLevel
