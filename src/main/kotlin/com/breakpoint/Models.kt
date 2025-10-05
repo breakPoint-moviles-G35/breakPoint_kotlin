@@ -3,6 +3,7 @@ package com.breakpoint
 data class SpaceItem(
     val id: String,
     val title: String,
+    val imageUrl: String?,
     val address: String,
     val hour: String,
     val rating: Double,
