@@ -232,6 +232,32 @@ class BookingRepository {
             Result.failure(t)
         }
     }
+
+    suspend fun updateBooking(
+        bookingId: String,
+        slotStartIso: String? = null,
+        slotEndIso: String? = null,
+        status: String? = null
+    ): Result<BookingDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.booking.update(
+                bookingId,
+                UpdateBookingRequest(slotStartIso, slotEndIso, status)
+            )
+            Result.success(dto)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun deleteBooking(bookingId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val resp = ApiProvider.booking.delete(bookingId)
+            if (resp.isSuccessful) Result.success(Unit) else Result.failure(IllegalStateException("No se pudo eliminar"))
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
 }
 
 

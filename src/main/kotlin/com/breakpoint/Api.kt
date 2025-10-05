@@ -10,7 +10,9 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
-import retrofit2.http.Path
+import retrofit2.http.PATCH
+import retrofit2.http.DELETE
+import retrofit2.Response
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -63,6 +65,12 @@ data class BookingDto(
     val status: String
 )
 
+data class UpdateBookingRequest(
+    val slotStart: String? = null,
+    val slotEnd: String? = null,
+    val status: String? = null
+)
+
 interface AuthApi {
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): UserDto
@@ -103,6 +111,12 @@ interface BookingApi {
 
     @POST("booking/{id}/checkout")
     suspend fun checkout(@Path("id") id: String): BookingDto
+
+    @PATCH("booking/{id}")
+    suspend fun update(@Path("id") id: String, @Body body: UpdateBookingRequest): BookingDto
+
+    @DELETE("booking/{id}")
+    suspend fun delete(@Path("id") id: String): Response<Unit>
 }
 
 data class BookingListItemDto(
