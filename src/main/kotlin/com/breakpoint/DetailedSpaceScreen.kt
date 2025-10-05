@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,17 +53,25 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
-    val space = remember { getDetailedSpace(spaceId) }
+    var space by remember { mutableStateOf<DetailedSpace?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
     var isFavorite by remember { mutableStateOf(false) }
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
-    
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
+        loading = true; error = null
+        val res = repo.getSpace(spaceId)
+        loading = false
+        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
         repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
     }
@@ -94,6 +103,24 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
             )
         }
     ) { paddingValues ->
+        if (loading) {
+            androidx.compose.material3.CircularProgressIndicator()
+        } else if (error != null) {
+            Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(text = error!!)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = {
+                    error = null; loading = true
+                    scope.launch {
+                        val repo = SpaceRepository()
+                        val res = repo.getSpace(spaceId)
+                        loading = false
+                        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+                    }
+                }) { Text("Reintentar") }
+            }
+        } else {
+        val s = space ?: return@Scaffold
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -121,7 +148,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = space.title,
+                            text = s.title,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
@@ -129,12 +156,12 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
                             Text(
-                                text = String.format("%.1f", space.rating),
+                                text = String.format("%.1f", s.rating),
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                             Text(
-                                text = "(${space.reviewCount})",
+                                text = "(${s.reviewCount})",
                                 color = Color.Gray,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
@@ -147,7 +174,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray)
                         Text(
-                            text = space.fullAddress,
+                            text = s.fullAddress,
                             color = Color.Gray,
                             modifier = Modifier.padding(start = 4.dp)
                         )
@@ -163,17 +190,17 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         DetailItem(
                             icon = Icons.Default.People,
                             label = "Capacity",
-                            value = "${space.capacity} people"
+                            value = "${s.capacity} people"
                         )
                         DetailItem(
                             icon = Icons.Default.Star,
                             label = "Size",
-                            value = space.size
+                            value = s.size
                         )
                         DetailItem(
                             icon = Icons.Default.Star,
                             label = "Price",
-                            value = "$${space.price}/hour"
+                            value = "$${s.price}/hour"
                         )
                     }
                     
@@ -187,7 +214,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = space.description,
+                        text = s.description,
                         style = MaterialTheme.typography.bodyLarge,
                         lineHeight = 24.sp
                     )
@@ -204,7 +231,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(space.amenities) { amenity ->
+                        items(s.amenities) { amenity ->
                             AmenityChip(amenity = amenity)
                         }
                     }
@@ -233,7 +260,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     
                     // Host Information
                     Text(
-                        text = "Hosted by ${space.hostName}",
+                        text = "Hosted by ${s.hostName}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -241,7 +268,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
                         Text(
-                            text = String.format("%.1f", space.hostRating),
+                            text = String.format("%.1f", s.hostRating),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 4.dp)
                         )
@@ -257,7 +284,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     // Reserve Button
                     Button(
                         onClick = { 
-                            navController.navigate(Destinations.ReserveRoom.createRoute(space.id))
+                            navController.navigate(Destinations.ReserveRoom.createRoute(s.id))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -277,6 +304,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
+        }
         }
     }
 }
@@ -402,23 +430,4 @@ fun ReservationBarChart(data: List<Int>, maxCap: Int = 10) {
     }
 }
 
-fun getDetailedSpace(spaceId: String): DetailedSpace {
-    return DetailedSpace(
-        id = spaceId,
-        title = "Modern Co-working Space",
-        address = "Downtown",
-        fullAddress = "123 Business District, Suite 456, City Center",
-        hour = "9:00 AM - 6:00 PM",
-        rating = 4.8,
-        reviewCount = 127,
-        price = 25,
-        description = "A beautifully designed co-working space perfect for entrepreneurs, freelancers, and small teams. Features high-speed internet, comfortable seating, natural lighting, and a collaborative atmosphere. The space includes private meeting rooms, phone booths, and a fully equipped kitchen.",
-        amenities = listOf("WiFi", "Coffee", "Parking", "Meeting Rooms", "Kitchen", "Printing"),
-        images = listOf("image1", "image2", "image3"),
-        hostName = "Sarah Johnson",
-        hostRating = 4.9,
-        availability = "Available today",
-        capacity = 12,
-        size = "120 sq ft"
-    )
-}
+// Legacy fallback removed: the screen now consumes backend data via SpaceRepository
