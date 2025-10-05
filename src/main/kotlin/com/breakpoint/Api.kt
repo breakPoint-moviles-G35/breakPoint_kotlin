@@ -8,8 +8,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.Query
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -173,4 +173,3 @@ object ApiProvider {
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
     val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
 }
-
