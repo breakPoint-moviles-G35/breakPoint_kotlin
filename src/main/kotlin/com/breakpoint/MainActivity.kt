@@ -1,6 +1,7 @@
 package com.breakpoint
 
 import android.content.Intent
+import android.content.Context
 import android.os.Bundle
 import android.nfc.NfcAdapter
 import android.widget.Toast
@@ -99,7 +100,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import com.google.android.gms.maps.model.LatLng
@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                 return
             }
             lastNfcHandledAtMs = now
-            showTopToast("NFC detectado")
+            showTopToast(this@MainActivity, "NFC detectado")
             // Ejecutar en el hilo principal
             CoroutineScope(Dispatchers.Main).launch {
                 // Asegurar token: si no está en memoria, intenta cargarlo desde DataStore
@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
                 val active = repo.findActiveNow()
                 active.fold(onSuccess = { list ->
                     if (list.isEmpty()) {
-                        showTopToast("No tienes una reserva activa ahora")
+                        showTopToast(this@MainActivity, "No tienes una reserva activa ahora")
                     } else {
                         // Si hay varias, toma la primera por ahora (mejorar: selector en UI)
                         val booking = list.first()
@@ -167,9 +167,9 @@ class MainActivity : ComponentActivity() {
                                 CoroutineScope(Dispatchers.Main).launch {
                                     val res = repo.checkout(booking.id)
                                     res.fold(onSuccess = {
-                                        showTopToast("Checkout exitoso")
+                                        showTopToast(this@MainActivity, "Checkout exitoso")
                                     }, onFailure = {
-                                        showTopToast(it.message ?: "Error en checkout")
+                                        showTopToast(this@MainActivity, it.message ?: "Error en checkout")
                                     })
                                 }
                             }
@@ -179,42 +179,41 @@ class MainActivity : ComponentActivity() {
                     }
                 }, onFailure = {
                     val msg = it.message ?: "Error consultando reserva"
-                    showTopToast(msg)
+                    showTopToast(this@MainActivity, msg)
                     if (msg.contains("401") || msg.contains("Unauthorized", ignoreCase = true)) {
-                        showTopToast("Inicia sesión y vuelve a escanear")
+                        showTopToast(this@MainActivity, "Inicia sesión y vuelve a escanear")
                     }
                 })
                 ApiProvider.setSuppressUnauthorizedNav(false)
                 if (ApiProvider.currentToken().isNullOrBlank()) {
-                    showTopToast("Inicia sesión y vuelve a escanear")
+                    showTopToast(this@MainActivity, "Inicia sesión y vuelve a escanear")
                 }
             }
         }
     }
+}
 
-    private fun showTopToast(message: String) {
-        // Custom toast ubicado arriba; duplicamos para ~5s
-        fun buildToast(): Toast {
-            val toast = Toast(this)
-            toast.duration = Toast.LENGTH_LONG
-            toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 120)
-            val tv = TextView(this)
-            tv.text = message
-            tv.setTextColor(AndroidColor.WHITE)
-            tv.textSize = 16f
-            val bg = ContextCompat.getDrawable(this, R.drawable.toast_bg)
-            tv.background = bg
-            val padH = (24 * resources.displayMetrics.density).toInt()
-            val padV = (12 * resources.displayMetrics.density).toInt()
-            tv.setPadding(padH, padV, padH, padV)
-            toast.view = tv
-            return toast
-        }
-        buildToast().show()
-        CoroutineScope(Dispatchers.Main).launch {
-            delay(3600)
-            buildToast().apply { duration = Toast.LENGTH_SHORT }.show()
-        }
+private fun showTopToast(context: Context, message: String) {
+    fun buildToast(): Toast {
+        val toast = Toast(context)
+        toast.duration = Toast.LENGTH_LONG
+        toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 120)
+        val tv = TextView(context)
+        tv.text = message
+        tv.setTextColor(AndroidColor.WHITE)
+        tv.textSize = 16f
+        val bg = ContextCompat.getDrawable(context, R.drawable.toast_bg)
+        tv.background = bg
+        val padH = (24 * context.resources.displayMetrics.density).toInt()
+        val padV = (12 * context.resources.displayMetrics.density).toInt()
+        tv.setPadding(padH, padV, padH, padV)
+        toast.view = tv
+        return toast
+    }
+    buildToast().show()
+    CoroutineScope(Dispatchers.Main).launch {
+        delay(3600)
+        buildToast().apply { duration = Toast.LENGTH_SHORT }.show()
     }
 }
 
@@ -1448,6 +1447,34 @@ private fun BookingCard(booking: BookingListItemDto) {
             if (!amount.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(amount, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        // Botones Editar y Eliminar
+        val scope = rememberCoroutineScope()
+        val repo = remember { BookingRepository() }
+        val context = LocalContext.current
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                // Ejemplo simple: sumar 1 hora al fin (en real, abrir diálogo de edición)
+                scope.launch {
+                    val end = try {
+                        val e = java.time.Instant.parse(booking.slotEnd).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                        e.plusHours(1).atZone(java.time.ZoneId.systemDefault()).toInstant().toString()
+                    } catch (_: Throwable) { booking.slotEnd }
+                    val res = repo.updateBooking(booking.id, slotEndIso = end)
+                    res.fold(onSuccess = { showTopToast(context, "Reserva actualizada") }, onFailure = { showTopToast(context, it.message ?: "Error al actualizar") })
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)) {
+                Text("Editar")
+            }
+            Button(onClick = {
+                scope.launch {
+                    val res = repo.deleteBooking(booking.id)
+                    res.fold(onSuccess = { showTopToast(context, "Reserva eliminada") }, onFailure = { showTopToast(context, it.message ?: "No se pudo eliminar") })
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                Text("Eliminar")
             }
         }
     }
