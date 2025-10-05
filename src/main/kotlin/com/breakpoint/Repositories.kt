@@ -59,6 +59,39 @@ class SpaceRepository {
         )
     }
 
+    private fun SpaceDetailFullDto.toDetailedSpace(): DetailedSpace {
+        val hourlyPrice = try { (price ?: "0").toDouble().toInt() } catch (_: Throwable) { 0 }
+        val fullAddress = geo ?: ""
+        val hostName = hostProfile?.id?.let { "Host ${it.take(4)}" } ?: "Host"
+        return DetailedSpace(
+            id = id,
+            title = title,
+            address = fullAddress,
+            fullAddress = fullAddress,
+            hour = "",
+            rating = rating_avg ?: 0.0,
+            reviewCount = bookings?.size ?: 0,
+            price = hourlyPrice,
+            description = rules ?: "",
+            amenities = amenities ?: emptyList(),
+            images = listOfNotNull(imageUrl),
+            hostName = hostName,
+            hostRating = (rating_avg ?: 0.0).coerceAtMost(5.0),
+            availability = "",
+            capacity = capacity,
+            size = ""
+        )
+    }
+
+    suspend fun getSpace(spaceId: String): Result<DetailedSpace> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.space.getSpaceDetail(spaceId)
+            Result.success(dto.toDetailedSpace())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val list = ApiProvider.space.getSpaces().map { it.toSpaceItem() }

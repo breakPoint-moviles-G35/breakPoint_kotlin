@@ -52,6 +52,29 @@ data class SpaceDetailDto(
     val bookings: List<SpaceBookingDto>?
 )
 
+// Full detail mirroring backend Space entity (only fields we use on the app)
+data class HostProfileDto(
+    val id: String?,
+    val verification_status: String?,
+    val payout_method: String?
+)
+
+data class SpaceDetailFullDto(
+    val id: String,
+    val title: String,
+    val subtitle: String?,
+    val imageUrl: String?,
+    val geo: String?,
+    val capacity: Int,
+    val amenities: List<String>?,
+    val accessibility: List<String>?,
+    val rules: String?,
+    val price: String?,
+    val rating_avg: Double?,
+    val bookings: List<SpaceBookingDto>?,
+    val hostProfile: HostProfileDto?
+)
+
 // Booking
 data class CreateBookingRequest(
     val spaceId: String,
@@ -96,7 +119,7 @@ interface SpaceApi {
     ): List<SpaceDto>
 
     @GET("space/{id}")
-    suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailDto
+    suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailFullDto
 }
 
 interface BookingApi {

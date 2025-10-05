@@ -38,6 +38,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,6 +60,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -324,7 +330,7 @@ fun BreakPointApp() {
             }
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
             composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
-            composable(Destinations.Reservations.route) { ReservationsScreen() }
+            composable(Destinations.Reservations.route) { ReservationsScreen(navController) }
             composable(Destinations.Profile.route) { ProfileScreen(navController) }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
@@ -332,7 +338,8 @@ fun BreakPointApp() {
             }
             composable(Destinations.ReserveRoom.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
-                ReserveRoomScreen(spaceId = spaceId, navController = navController)
+                val bookingId = backStackEntry.arguments?.getString("bookingId")
+                ReserveRoomScreen(spaceId = spaceId, navController = navController, bookingId = bookingId)
             }
         }
     }
@@ -348,8 +355,10 @@ sealed class Destinations(val route: String, val label: String) {
     data object DetailedSpace : Destinations("detailed_space/{spaceId}", "Space Details") {
         fun createRoute(spaceId: String) = "detailed_space/$spaceId"
     }
-    data object ReserveRoom : Destinations("reserve_room/{spaceId}", "Reserve Room") {
-        fun createRoute(spaceId: String) = "reserve_room/$spaceId"
+    data object ReserveRoom : Destinations("reserve_room/{spaceId}?bookingId={bookingId}", "Reserve Room") {
+        fun createRoute(spaceId: String, bookingId: String? = null): String {
+            return if (bookingId.isNullOrBlank()) "reserve_room/$spaceId" else "reserve_room/$spaceId?bookingId=$bookingId"
+        }
     }
 }
 
@@ -1314,7 +1323,7 @@ private fun RateScreen() {
 }
 
 @Composable
-fun ReservationsScreen() {
+fun ReservationsScreen(navController: NavHostController) {
     val repo = remember { BookingRepository() }
     var query by remember { mutableStateOf("") }
     var items by remember { mutableStateOf<List<BookingListItemDto>>(emptyList()) }
@@ -1389,7 +1398,16 @@ fun ReservationsScreen() {
                     .padding(horizontal = 16.dp)
             ) {
                 items(filtered) { booking ->
-                    BookingCard(booking)
+                    BookingCard(
+                        booking = booking,
+                        onDeleted = { id ->
+                            items = items.filter { it.id != id }
+                            filtered = filtered.filter { it.id != id }
+                        },
+                        onEdit = { spaceId, bookingId ->
+                            navController.navigate(Destinations.ReserveRoom.createRoute(spaceId, bookingId))
+                        }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.material3.Divider()
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1400,7 +1418,11 @@ fun ReservationsScreen() {
 }
 
 @Composable
-private fun BookingCard(booking: BookingListItemDto) {
+private fun BookingCard(
+    booking: BookingListItemDto,
+    onDeleted: (String) -> Unit = {},
+    onEdit: (String, String) -> Unit = { _, _ -> }
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1454,28 +1476,59 @@ private fun BookingCard(booking: BookingListItemDto) {
         val scope = rememberCoroutineScope()
         val repo = remember { BookingRepository() }
         val context = LocalContext.current
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                // Ejemplo simple: sumar 1 hora al fin (en real, abrir diálogo de edición)
-                scope.launch {
-                    val end = try {
-                        val e = java.time.Instant.parse(booking.slotEnd).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
-                        e.plusHours(1).atZone(java.time.ZoneId.systemDefault()).toInstant().toString()
-                    } catch (_: Throwable) { booking.slotEnd }
-                    val res = repo.updateBooking(booking.id, slotEndIso = end)
-                    res.fold(onSuccess = { showTopToast(context, "Reserva actualizada") }, onFailure = { showTopToast(context, it.message ?: "Error al actualizar") })
-                }
-            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)) {
-                Text("Editar")
+        var showEditDialog by remember { mutableStateOf(false) }
+        var newEndIso by remember { mutableStateOf(booking.slotEnd) }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IconButton(onClick = {
+                val sid = booking.space?.id ?: return@IconButton
+                onEdit(sid, booking.id)
+            }) {
+                Icon(Icons.Filled.Edit, contentDescription = "Editar")
             }
-            Button(onClick = {
+            IconButton(onClick = {
                 scope.launch {
                     val res = repo.deleteBooking(booking.id)
-                    res.fold(onSuccess = { showTopToast(context, "Reserva eliminada") }, onFailure = { showTopToast(context, it.message ?: "No se pudo eliminar") })
+                    res.fold(
+                        onSuccess = {
+                            showTopToast(context, "Reserva eliminada")
+                            onDeleted(booking.id)
+                        },
+                        onFailure = { showTopToast(context, it.message ?: "No se pudo eliminar") }
+                    )
                 }
-            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
-                Text("Eliminar")
+            }) {
+                Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
             }
+        }
+
+        if (showEditDialog) {
+            AlertDialog(
+                onDismissRequest = { showEditDialog = false },
+                title = { Text("Editar reserva") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Nueva hora de fin (ISO 8601)")
+                        TextField(
+                            value = newEndIso,
+                            onValueChange = { newEndIso = it },
+                            singleLine = true,
+                            placeholder = { Text("yyyy-MM-dd'T'HH:mm:ss'Z'") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showEditDialog = false
+                        scope.launch {
+                            val res = repo.updateBooking(booking.id, slotEndIso = newEndIso)
+                            res.fold(onSuccess = { showTopToast(context, "Reserva actualizada") }, onFailure = { showTopToast(context, it.message ?: "Error al actualizar") })
+                        }
+                    }) { Text("Guardar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditDialog = false }) { Text("Cancelar") }
+                }
+            )
         }
     }
 }
