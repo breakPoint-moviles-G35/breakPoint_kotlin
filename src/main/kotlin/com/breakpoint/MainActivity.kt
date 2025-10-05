@@ -83,6 +83,7 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -544,6 +545,19 @@ fun ExploreScreen(navController: NavHostController) {
     var endHour by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
     var showMap by remember { mutableStateOf(false) }
+    var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    val parseLatLng: (String) -> LatLng? = { text ->
+        val regex = Regex("-?\\d+(?:\\.\\d+)?")
+        val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
+        if (nums.size < 2) null else {
+            val a = nums[0]
+            val b = nums[1]
+            val lat: Double
+            val lng: Double
+            if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+            LatLng(lat, lng)
+        }
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
@@ -661,15 +675,14 @@ fun ExploreScreen(navController: NavHostController) {
                                     } else {
                                         val lat = location.latitude
                                         val lng = location.longitude
+                                        userLatLng = LatLng(lat, lng)
                                         // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
                                         val withDistance = items.map { s ->
-                                            val parts = s.address.split(",")
-                                            val maybeLat = parts.getOrNull(0)?.toDoubleOrNull()
-                                            val maybeLng = parts.getOrNull(1)?.toDoubleOrNull()
-                                            val d = if (maybeLat != null && maybeLng != null) {
-                                                val dLat = Math.toRadians(maybeLat - lat)
-                                                val dLng = Math.toRadians(maybeLng - lng)
-                                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(maybeLat))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                                            val ll = parseLatLng(s.address)
+                                            val d = if (ll != null) {
+                                                val dLat = Math.toRadians(ll.latitude - lat)
+                                                val dLng = Math.toRadians(ll.longitude - lng)
+                                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
                                                 val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
                                                 6371.0 * c // km
                                             } else Double.MAX_VALUE
@@ -716,11 +729,8 @@ fun ExploreScreen(navController: NavHostController) {
                 }) { Text("Reintentar") }
             }
         } else if (showMap) {
-            val center = filtered.firstOrNull()?.address?.split(",")?.let { parts ->
-                val la = parts.getOrNull(0)?.toDoubleOrNull()
-                val lo = parts.getOrNull(1)?.toDoubleOrNull()
-                if (la != null && lo != null) LatLng(la, lo) else LatLng(4.65, -74.1)
-            } ?: LatLng(4.65, -74.1)
+            val firstLatLng = filtered.firstOrNull()?.let { parseLatLng(it.address) }
+            val center = firstLatLng ?: userLatLng ?: LatLng(4.65, -74.1)
             val cameraState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(center, 12f)
             }
@@ -728,12 +738,10 @@ fun ExploreScreen(navController: NavHostController) {
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraState
             ) {
+                userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
                 filtered.forEach { s ->
-                    val parts = s.address.split(",")
-                    val la = parts.getOrNull(0)?.toDoubleOrNull()
-                    val lo = parts.getOrNull(1)?.toDoubleOrNull()
-                    if (la != null && lo != null) {
-                        Marker(state = MarkerState(position = LatLng(la, lo)), title = s.title)
+                    parseLatLng(s.address)?.let { ll ->
+                        Marker(state = MarkerState(position = ll), title = s.title)
                     }
                 }
             }
