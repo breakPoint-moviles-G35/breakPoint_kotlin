@@ -124,6 +124,44 @@ class SpaceRepository {
             Result.failure(t)
         }
     }
+
+    suspend fun getHourlyHistogram(spaceId: String): Result<List<Int>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            val counts = IntArray(24)
+            fun parseDate(text: String): java.util.Date? {
+                val patterns = listOf(
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                    "yyyy-MM-dd'T'HH:mm:ssX",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'"
+                )
+                for (p in patterns) {
+                    try {
+                        val sdf = java.text.SimpleDateFormat(p, java.util.Locale.US)
+                        return sdf.parse(text)
+                    } catch (_: Throwable) {}
+                }
+                return null
+            }
+            detail.bookings.orEmpty().forEach { b ->
+                try {
+                    val start = parseDate(b.slot_start) ?: return@forEach
+                    val end = parseDate(b.slot_end) ?: return@forEach
+                    val cal = java.util.Calendar.getInstance().apply { time = start }
+                    val calEnd = java.util.Calendar.getInstance().apply { time = end }
+                    while (cal.before(calEnd)) {
+                        val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                        counts[h] = counts[h] + 1
+                        cal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+                    }
+                } catch (_: Throwable) {}
+            }
+            Result.success(counts.toList())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
 }
 
 

@@ -48,6 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,10 +59,12 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     val space = remember { getDetailedSpace(spaceId) }
     var isFavorite by remember { mutableStateOf(false) }
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
-
+    var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
+    
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
+        repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
     }
     
     androidx.compose.material3.Scaffold(
@@ -221,6 +227,9 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    ReservationBarChart(data = histogram)
                     
                     // Host Information
                     Text(
@@ -342,6 +351,54 @@ fun PopularHourChip(hour: Int, count: Int) {
                 color = Color.Gray
             )
         }
+    }
+}
+
+@Composable
+fun ReservationBarChart(data: List<Int>, maxCap: Int = 10) {
+    if (data.isEmpty()) return
+    val capped = data.map { it.coerceAtMost(maxCap) }
+    val maxValue = (capped.maxOrNull() ?: 1).coerceAtLeast(1)
+    val barColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Tap hours for details",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(8.dp))
+        Canvas(modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)) {
+            val barCount = 24
+            val gap = 8.dp.toPx()
+            val barWidth = (size.width - gap * (barCount + 1)) / barCount
+            val heightUnit = if (maxValue == 0) 0f else (size.height - 16.dp.toPx()) / maxValue
+            for (i in 0 until barCount) {
+                val value = capped.getOrElse(i) { 0 }
+                val barHeight = value * heightUnit
+                val left = gap + i * (barWidth + gap)
+                val top = size.height - barHeight
+                drawRoundRect(
+                    color = barColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                    size = Size(barWidth, barHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            val labels = listOf("6a","9a","12p","3p","6p","9p")
+            labels.forEach { lbl ->
+                Text(text = lbl, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
+        Text(
+            text = "Tope visual en $maxCap reservas por hora",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.Gray
+        )
     }
 }
 
