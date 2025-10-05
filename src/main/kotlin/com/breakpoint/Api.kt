@@ -9,6 +9,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.Path
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -36,6 +37,18 @@ data class SpaceDto(
     val rating_avg: Double?
 )
 
+// Detail DTOs (subset of backend response for /space/:id)
+data class BookingDto(
+    val slot_start: String,
+    val slot_end: String
+)
+
+data class SpaceDetailDto(
+    val id: String,
+    val title: String,
+    val bookings: List<BookingDto>?
+)
+
 interface AuthApi {
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): UserDto
@@ -59,6 +72,9 @@ interface SpaceApi {
         @Query("start") start: String,
         @Query("end") end: String
     ): List<SpaceDto>
+
+    @GET("space/{id}")
+    suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailDto
 }
 
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {

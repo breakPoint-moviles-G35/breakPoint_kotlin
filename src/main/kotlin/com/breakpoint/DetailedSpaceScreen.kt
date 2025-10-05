@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,12 @@ import androidx.navigation.NavHostController
 fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     val space = remember { getDetailedSpace(spaceId) }
     var isFavorite by remember { mutableStateOf(false) }
+    var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
+
+    LaunchedEffect(spaceId) {
+        val repo = SpaceRepository()
+        repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
+    }
     
     androidx.compose.material3.Scaffold(
         topBar = {
@@ -197,6 +204,23 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     }
                     
                     Spacer(modifier = Modifier.height(24.dp))
+
+                    // Popular Hours (week)
+                    Text(
+                        text = "Horas más reservadas (semana)",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (popular.isEmpty()) {
+                        Text(text = "Sin datos suficientes")
+                    } else {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(popular) { (hour, count) ->
+                                PopularHourChip(hour, count)
+                            }
+                        }
+                    }
                     
                     // Host Information
                     Text(
@@ -290,6 +314,32 @@ fun AmenityChip(amenity: String) {
                 text = amenity,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+fun PopularHourChip(hour: Int, count: Int) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = String.format("%02d:00", hour),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "x$count",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
             )
         }
     }
