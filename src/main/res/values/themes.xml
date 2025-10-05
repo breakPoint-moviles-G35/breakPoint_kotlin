@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Theme sin ActionBar para la aplicación BreakPoint -->
+    <style name="Theme.BreakPoint.NoActionBar" parent="android:Theme.Light.NoTitleBar">
+        <!-- Status bar color -->
+        <item name="android:statusBarColor" tools:targetApi="l">#FF5C1B6C</item>
+        <!-- Navigation bar color -->
+        <item name="android:navigationBarColor" tools:targetApi="l">#FF5C1B6C</item>
+        <!-- Window background -->
+        <item name="android:windowBackground">@color/white</item>
+        <!-- Asegurar que no haya ActionBar -->
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
+</resources>
