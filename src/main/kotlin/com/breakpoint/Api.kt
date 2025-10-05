@@ -8,6 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 // DTOs
@@ -80,6 +81,12 @@ interface BookingApi {
 
     @GET("booking")
     suspend fun listMine(): List<BookingListItemDto>
+
+    @GET("booking/active-now")
+    suspend fun activeNow(): List<BookingListItemDto>
+
+    @POST("booking/{id}/checkout")
+    suspend fun checkout(@Path("id") id: String): BookingDto
 }
 
 data class BookingListItemDto(
@@ -119,10 +126,12 @@ object ApiProvider {
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null
+    @Volatile private var suppressUnauthorizedNav: Boolean = false
 
     fun setToken(token: String?) { authToken = token }
     fun setOnUnauthorized(handler: (() -> Unit)?) { onUnauthorized = handler }
     fun currentToken(): String? = authToken
+    fun setSuppressUnauthorizedNav(suppress: Boolean) { suppressUnauthorizedNav = suppress }
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -137,7 +146,7 @@ object ApiProvider {
                     }.build()
                 )
                 if (response.code == 401) {
-                    onUnauthorized?.invoke()
+                    if (!suppressUnauthorizedNav) onUnauthorized?.invoke()
                 }
                 response
             }

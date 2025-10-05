@@ -136,6 +136,24 @@ class BookingRepository {
             Result.failure(t)
         }
     }
+
+    suspend fun findActiveNow(): Result<List<BookingListItemDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.booking.activeNow()
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun checkout(bookingId: String): Result<BookingDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val res = ApiProvider.booking.checkout(bookingId)
+            Result.success(res)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
 }
 
 
