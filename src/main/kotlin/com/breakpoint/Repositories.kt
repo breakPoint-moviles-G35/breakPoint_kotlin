@@ -77,6 +77,7 @@ class SpaceRepository {
             images = listOfNotNull(imageUrl),
             hostName = hostName,
             hostRating = (rating_avg ?: 0.0).coerceAtMost(5.0),
+            hostProfileId = hostProfile?.id,
             availability = "",
             capacity = capacity,
             size = ""
@@ -287,6 +288,46 @@ class BookingRepository {
         return@withContext try {
             val resp = ApiProvider.booking.delete(bookingId)
             if (resp.isSuccessful) Result.success(Unit) else Result.failure(IllegalStateException("No se pudo eliminar"))
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
+class HostProfileRepository {
+    suspend fun findById(hostProfileId: String): Result<HostProfileDetailDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val detail = ApiProvider.hostProfile.findById(hostProfileId)
+            Result.success(detail)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun listAll(): Result<List<HostProfileDetailDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.hostProfile.listAll()
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
+class ReviewRepository {
+    suspend fun listForSpace(spaceId: String): Result<List<ReviewDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.review.listForSpace(spaceId)
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun statsForSpace(spaceId: String): Result<ReviewStatsDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val stats = ApiProvider.review.statsForSpace(spaceId)
+            Result.success(stats)
         } catch (t: Throwable) {
             Result.failure(t)
         }

@@ -24,6 +24,7 @@ data class DetailedSpace(
     val images: List<String>,
     val hostName: String,
     val hostRating: Double,
+    val hostProfileId: String? = null,
     val availability: String,
     val capacity: Int,
     val size: String

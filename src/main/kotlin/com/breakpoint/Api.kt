@@ -13,6 +13,7 @@ import retrofit2.http.Query
 import retrofit2.http.PATCH
 import retrofit2.http.DELETE
 import retrofit2.Response
+import com.google.gson.annotations.SerializedName
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -74,6 +75,40 @@ data class SpaceDetailFullDto(
     val bookings: List<SpaceBookingDto>?,
     val hostProfile: HostProfileDto?
 )
+
+data class HostProfileDetailDto(
+    val id: String?,
+    @SerializedName("displayName") val displayName: String? = null,
+    @SerializedName("bio") val bio: String? = null,
+    @SerializedName("phoneNumber") val phoneNumber: String? = null,
+    @SerializedName("userId") val userId: String? = null,
+    @SerializedName("ratingAverage") val ratingAverage: Double? = null,
+    @SerializedName("totalReviews") val totalReviews: Int? = null
+)
+
+data class ReviewDto(
+    val id: String,
+    val rating: Int,
+    val comment: String?,
+    val createdAt: String?,
+    val updatedAt: String?,
+    @SerializedName("userId") val userId: String?,
+    @SerializedName("spaceId") val spaceId: String?
+)
+
+data class ReviewStatsDto(
+    @SerializedName("average") val average: Double? = null,
+    @SerializedName("avgRating") val avgRating: Double? = null,
+    @SerializedName("rating") val rating: Double? = null,
+    @SerializedName("count") val count: Int? = null,
+    @SerializedName("total") val total: Int? = null,
+    @SerializedName("reviews") val reviews: Int? = null
+) {
+    val resolvedAverage: Double
+        get() = average ?: avgRating ?: rating ?: 0.0
+    val resolvedCount: Int
+        get() = count ?: total ?: reviews ?: 0
+}
 
 // Booking
 data class CreateBookingRequest(
@@ -140,6 +175,25 @@ interface BookingApi {
 
     @DELETE("booking/{id}")
     suspend fun delete(@Path("id") id: String): Response<Unit>
+}
+
+interface HostProfileApi {
+    @GET("host-profile/{id}")
+    suspend fun findById(@Path("id") id: String): HostProfileDetailDto
+
+    @GET("host-profile")
+    suspend fun listAll(): List<HostProfileDetailDto>
+
+    @GET("host-profile/my-profile")
+    suspend fun myProfile(): HostProfileDetailDto
+}
+
+interface ReviewApi {
+    @GET("review/space/{spaceId}")
+    suspend fun listForSpace(@Path("spaceId") spaceId: String): List<ReviewDto>
+
+    @GET("review/space/{spaceId}/stats")
+    suspend fun statsForSpace(@Path("spaceId") spaceId: String): ReviewStatsDto
 }
 
 data class BookingListItemDto(
@@ -218,5 +272,6 @@ object ApiProvider {
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
     val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
+    val hostProfile: HostProfileApi by lazy { retrofit.create(HostProfileApi::class.java) }
+    val review: ReviewApi by lazy { retrofit.create(ReviewApi::class.java) }
 }
-

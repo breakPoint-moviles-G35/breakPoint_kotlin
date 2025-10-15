@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Wifi
@@ -54,6 +55,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,16 +69,45 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     var isFavorite by remember { mutableStateOf(false) }
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var hostProfileDetail by remember { mutableStateOf<HostProfileDetailDto?>(null) }
+    var hostError by remember { mutableStateOf<String?>(null) }
+    var reviewStats by remember { mutableStateOf<ReviewStatsDto?>(null) }
+    var reviews by remember { mutableStateOf<List<ReviewDto>>(emptyList()) }
+    var reviewError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val hostProfileRepository = remember { HostProfileRepository() }
+    val reviewRepository = remember { ReviewRepository() }
 
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
         loading = true; error = null
+        hostError = null
+        reviewError = null
+        hostProfileDetail = null
+        reviewStats = null
+        reviews = emptyList()
         val res = repo.getSpace(spaceId)
         loading = false
-        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+        res.fold(onSuccess = { detail ->
+            space = detail
+            val hostId = detail.hostProfileId
+            if (!hostId.isNullOrBlank()) {
+                hostProfileRepository.findById(hostId).fold(
+                    onSuccess = { hostProfileDetail = it },
+                    onFailure = { hostError = it.message ?: "No se pudo cargar el anfitrión" }
+                )
+            }
+        }, onFailure = { error = it.message ?: "Error cargando espacio" })
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
         repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
+        reviewRepository.statsForSpace(spaceId).fold(
+            onSuccess = { reviewStats = it },
+            onFailure = { failure -> reviewError = failure.message ?: "No se pudieron cargar las reseñas" }
+        )
+        reviewRepository.listForSpace(spaceId).fold(
+            onSuccess = { reviews = it },
+            onFailure = { failure -> reviewError = failure.message ?: "No se pudieron cargar las reseñas" }
+        )
     }
     
     androidx.compose.material3.Scaffold(
@@ -153,15 +187,19 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
+                        val stats = reviewStats
+                        val ratingValue = stats?.resolvedAverage ?: s.rating
+                        val displayedRating = if (ratingValue <= 0.0) "N/A" else String.format(Locale.getDefault(), "%.1f", ratingValue)
+                        val displayedCount = stats?.resolvedCount ?: s.reviewCount
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
                             Text(
-                                text = String.format("%.1f", s.rating),
+                                text = displayedRating,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                             Text(
-                                text = "(${s.reviewCount})",
+                                text = if (displayedCount > 0) "($displayedCount)" else "(sin reseñas)",
                                 color = Color.Gray,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
@@ -259,27 +297,102 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     ReservationBarChart(data = histogram)
                     
                     // Host Information
+                    val hostNameDisplay = hostProfileDetail?.displayName?.takeIf { it.isNotBlank() } ?: s.hostName
                     Text(
-                        text = "Hosted by ${s.hostName}",
+                        text = "Hosted by $hostNameDisplay",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = hostNameDisplay,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val hostRatingValue = hostProfileDetail?.ratingAverage ?: s.hostRating
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
                         Text(
-                            text = String.format("%.1f", s.hostRating),
+                            text = if (hostRatingValue <= 0.0) "N/A" else String.format(Locale.getDefault(), "%.1f", hostRatingValue),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 4.dp)
                         )
+                        val hostReviews = hostProfileDetail?.totalReviews
+                        if ((hostReviews ?: 0) > 0) {
+                            Text(
+                                text = "($hostReviews reviews)",
+                                color = Color.Gray,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        } else {
+                            Text(
+                                text = "host rating",
+                                color = Color.Gray,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
+                    }
+                    hostProfileDetail?.bio?.takeIf { it.isNotBlank() }?.let { bio ->
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "host rating",
-                            color = Color.Gray,
-                            modifier = Modifier.padding(start = 4.dp)
+                            text = bio.trim(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
+                    }
+                    if (hostError != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = hostError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Red
                         )
                     }
                     
                     Spacer(modifier = Modifier.height(32.dp))
+
+                    Text(
+                        text = "Opiniones de usuarios",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    when {
+                        reviewError != null -> {
+                            Text(
+                                text = reviewError!!,
+                                color = Color.Red,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        reviews.isEmpty() -> {
+                            Text(
+                                text = "Aún no hay reseñas para este espacio",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                        }
+                        else -> {
+                            reviews.take(4).forEach { review ->
+                                ReviewCard(review = review)
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                            if (reviews.size > 4) {
+                                Text(
+                                    text = "+${reviews.size - 4} reseñas más disponibles",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     // Reserve Button
                     Button(
@@ -305,6 +418,60 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                 }
             }
         }
+        }
+    }
+}
+
+@Composable
+fun ReviewCard(review: ReviewDto) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        shadowElevation = 0.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
+                Text(
+                    text = "${review.rating}/5",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+                formatReviewDate(review.updatedAt ?: review.createdAt)?.let { date ->
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = date,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+            }
+            review.comment?.takeIf { it.isNotBlank() }?.let { comment ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = comment.trim(),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            review.userId?.takeIf { it.isNotBlank() }?.let { uid ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Usuario ${uid.takeLast(6)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -430,4 +597,13 @@ fun ReservationBarChart(data: List<Int>, maxCap: Int = 10) {
     }
 }
 
-// Legacy fallback removed: the screen now consumes backend data via SpaceRepository
+private fun formatReviewDate(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    return try {
+        val instant = Instant.parse(iso)
+        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.getDefault())
+        instant.atZone(ZoneId.systemDefault()).format(formatter)
+    } catch (_: Throwable) {
+        iso.take(16)
+    }
+}

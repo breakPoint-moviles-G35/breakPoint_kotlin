@@ -244,6 +244,7 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
     )
 }
 
+// Navbar
 @Composable
 fun BreakPointApp() {
     val navController = rememberNavController()
@@ -407,6 +408,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
     }
 }
 
+// Pantalla de autenticacion
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
@@ -869,6 +871,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     }
 }
 
+// Exploración de espacios con filtros por fecha, rango horario, ubicación y mapa (GoogleMap)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(navController: NavHostController) {
@@ -1322,6 +1325,8 @@ private fun RateScreen() {
     SimpleCenter(text = "Rate")
 }
 
+
+// Gestión de reservas (listado, edición, eliminación, navegación a reserva)
 @Composable
 fun ReservationsScreen(navController: NavHostController) {
     val repo = remember { BookingRepository() }
@@ -1545,6 +1550,7 @@ private fun formatBookingTime(b: BookingListItemDto): String {
     }
 }
 
+//perfil 
 @Composable
 fun ProfileScreen(navController: NavHostController) {
     val repo = remember { AuthRepository() }
@@ -1625,6 +1631,7 @@ fun ProfileScreen(navController: NavHostController) {
         }
     }
 }
+
 
 @Composable
 fun ReservationCard(reservation: ReservationItem) {
