@@ -1031,6 +1031,7 @@ fun ExploreScreen(navController: NavHostController) {
                         .clip(MaterialTheme.shapes.extraLarge)
                         .background(Color.White)
                         .clickable {
+                            showMap = true
                             coroutineScope.launch {
                                 error = null
                                 loading = true
