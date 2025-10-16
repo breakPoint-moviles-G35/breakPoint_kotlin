@@ -1100,9 +1100,8 @@ fun ExploreScreen(navController: NavHostController) {
                         markerState.position = ll
                         MarkerInfoWindow(
                             state = markerState,
-                            onClick = {
+                            onInfoWindowClick = {
                                 navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
-                                true
                             }
                         ) {
                             Surface(
