@@ -3,6 +3,7 @@ package com.breakpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
+import kotlin.math.abs
 
 class AuthRepository {
     suspend fun login(email: String, password: String): Result<UserDto> = withContext(Dispatchers.IO) {
@@ -48,15 +49,37 @@ class SpaceRepository {
             // Backend expone 'price' como decimal (string). Es precio por hora.
             (price ?: "0").toDouble().toInt()
         } catch (_: Throwable) { 0 }
+        val latLng = parseGeoToPair(geo)
+        val locationLabel = subtitle ?: geo ?: ""
         return SpaceItem(
             id = id,
             title = title,
             imageUrl = imageUrl,
-            address = geo ?: "",
+            address = locationLabel,
             hour = "",
             rating = rating_avg ?: 0.0,
-            price = hourlyPrice
+            price = hourlyPrice,
+            geo = geo,
+            latitude = latLng?.first,
+            longitude = latLng?.second
         )
+    }
+
+    private fun parseGeoToPair(geo: String?): Pair<Double, Double>? {
+        if (geo.isNullOrBlank()) return null
+        val regex = Regex("-?\\d+(?:\\.\\d+)?")
+        val numbers = regex.findAll(geo).mapNotNull { it.value.toDoubleOrNull() }.toList()
+        if (numbers.size < 2) return null
+        val a = numbers[0]
+        val b = numbers[1]
+        val lat: Double
+        val lng: Double
+        if (abs(a) > 90 && abs(b) <= 90) {
+            lat = b; lng = a
+        } else {
+            lat = a; lng = b
+        }
+        return lat to lng
     }
 
     private fun SpaceDetailFullDto.toDetailedSpace(): DetailedSpace {

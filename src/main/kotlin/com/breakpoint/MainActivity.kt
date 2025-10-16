@@ -888,16 +888,24 @@ fun ExploreScreen(navController: NavHostController) {
     val context = LocalContext.current
     var showMap by remember { mutableStateOf(false) }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
-    val parseLatLng: (String) -> LatLng? = { text ->
-        val regex = Regex("-?\\d+(?:\\.\\d+)?")
-        val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
-        if (nums.size < 2) null else {
-            val a = nums[0]
-            val b = nums[1]
-            val lat: Double
-            val lng: Double
-            if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
-            LatLng(lat, lng)
+    val parseLatLngString: (String?) -> LatLng? = { text ->
+        if (text.isNullOrBlank()) null else {
+            val regex = Regex("-?\\d+(?:\\.\\d+)?")
+            val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
+            if (nums.size < 2) null else {
+                val a = nums[0]
+                val b = nums[1]
+                val lat: Double
+                val lng: Double
+                if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+                LatLng(lat, lng)
+            }
+        }
+    }
+    val spaceToLatLng: (SpaceItem) -> LatLng? = { space ->
+        when {
+            space.latitude != null && space.longitude != null -> LatLng(space.latitude, space.longitude)
+            else -> parseLatLngString(space.geo ?: space.address)
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -920,13 +928,11 @@ fun ExploreScreen(navController: NavHostController) {
                         val lat = location.latitude
                         val lng = location.longitude
                         val withDistance = items.map { s ->
-                            val parts = s.address.split(",")
-                            val maybeLat = parts.getOrNull(0)?.toDoubleOrNull()
-                            val maybeLng = parts.getOrNull(1)?.toDoubleOrNull()
-                            val d = if (maybeLat != null && maybeLng != null) {
-                                val dLat = Math.toRadians(maybeLat - lat)
-                                val dLng = Math.toRadians(maybeLng - lng)
-                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(maybeLat))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                            val ll = spaceToLatLng(s)
+                            val d = if (ll != null) {
+                                val dLat = Math.toRadians(ll.latitude - lat)
+                                val dLng = Math.toRadians(ll.longitude - lng)
+                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
                                 val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
                                 6371.0 * c
                             } else Double.MAX_VALUE
@@ -1020,7 +1026,7 @@ fun ExploreScreen(navController: NavHostController) {
                                         userLatLng = LatLng(lat, lng)
                                         // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
                                         val withDistance = items.map { s ->
-                                            val ll = parseLatLng(s.address)
+                                            val ll = spaceToLatLng(s)
                                             val d = if (ll != null) {
                                                 val dLat = Math.toRadians(ll.latitude - lat)
                                                 val dLng = Math.toRadians(ll.longitude - lng)
@@ -1071,7 +1077,7 @@ fun ExploreScreen(navController: NavHostController) {
                 }) { Text("Reintentar") }
             }
         } else if (showMap) {
-            val firstLatLng = filtered.firstOrNull()?.let { parseLatLng(it.address) }
+            val firstLatLng = filtered.firstOrNull()?.let { spaceToLatLng(it) }
             val center = firstLatLng ?: userLatLng ?: LatLng(4.65, -74.1)
             val cameraState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(center, 12f)
@@ -1082,8 +1088,15 @@ fun ExploreScreen(navController: NavHostController) {
             ) {
                 userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
                 filtered.forEach { s ->
-                    parseLatLng(s.address)?.let { ll ->
-                        Marker(state = MarkerState(position = ll), title = s.title)
+                    spaceToLatLng(s)?.let { ll ->
+                        Marker(
+                            state = MarkerState(position = ll),
+                            title = s.title,
+                            snippet = s.address,
+                            onInfoWindowClick = {
+                                navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                            }
+                        )
                     }
                 }
             }
