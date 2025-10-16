@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,8 +28,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -112,6 +116,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerInfoWindow
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.abs
@@ -888,16 +893,24 @@ fun ExploreScreen(navController: NavHostController) {
     val context = LocalContext.current
     var showMap by remember { mutableStateOf(false) }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
-    val parseLatLng: (String) -> LatLng? = { text ->
-        val regex = Regex("-?\\d+(?:\\.\\d+)?")
-        val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
-        if (nums.size < 2) null else {
-            val a = nums[0]
-            val b = nums[1]
-            val lat: Double
-            val lng: Double
-            if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
-            LatLng(lat, lng)
+    val parseLatLngString: (String?) -> LatLng? = { text ->
+        if (text.isNullOrBlank()) null else {
+            val regex = Regex("-?\\d+(?:\\.\\d+)?")
+            val nums = regex.findAll(text).mapNotNull { it.value.toDoubleOrNull() }.toList()
+            if (nums.size < 2) null else {
+                val a = nums[0]
+                val b = nums[1]
+                val lat: Double
+                val lng: Double
+                if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+                LatLng(lat, lng)
+            }
+        }
+    }
+    val spaceToLatLng: (SpaceItem) -> LatLng? = { space ->
+        when {
+            space.latitude != null && space.longitude != null -> LatLng(space.latitude, space.longitude)
+            else -> parseLatLngString(space.geo ?: space.address)
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -920,13 +933,11 @@ fun ExploreScreen(navController: NavHostController) {
                         val lat = location.latitude
                         val lng = location.longitude
                         val withDistance = items.map { s ->
-                            val parts = s.address.split(",")
-                            val maybeLat = parts.getOrNull(0)?.toDoubleOrNull()
-                            val maybeLng = parts.getOrNull(1)?.toDoubleOrNull()
-                            val d = if (maybeLat != null && maybeLng != null) {
-                                val dLat = Math.toRadians(maybeLat - lat)
-                                val dLng = Math.toRadians(maybeLng - lng)
-                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(maybeLat))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                            val ll = spaceToLatLng(s)
+                            val d = if (ll != null) {
+                                val dLat = Math.toRadians(ll.latitude - lat)
+                                val dLng = Math.toRadians(ll.longitude - lng)
+                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
                                 val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
                                 6371.0 * c
                             } else Double.MAX_VALUE
@@ -961,7 +972,9 @@ fun ExploreScreen(navController: NavHostController) {
                     onValueChange = { 
                         query = it
                         filtered = if (query.isBlank()) items else items.filter { s ->
-                            s.title.contains(query, ignoreCase = true) || s.address.contains(query, ignoreCase = true)
+                            s.title.contains(query, ignoreCase = true) ||
+                                    s.address.contains(query, ignoreCase = true) ||
+                                    (s.subtitle?.contains(query, ignoreCase = true) == true)
                         }
                     },
                     singleLine = true,
@@ -1020,7 +1033,7 @@ fun ExploreScreen(navController: NavHostController) {
                                         userLatLng = LatLng(lat, lng)
                                         // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
                                         val withDistance = items.map { s ->
-                                            val ll = parseLatLng(s.address)
+                                            val ll = spaceToLatLng(s)
                                             val d = if (ll != null) {
                                                 val dLat = Math.toRadians(ll.latitude - lat)
                                                 val dLng = Math.toRadians(ll.longitude - lng)
@@ -1071,10 +1084,10 @@ fun ExploreScreen(navController: NavHostController) {
                 }) { Text("Reintentar") }
             }
         } else if (showMap) {
-            val firstLatLng = filtered.firstOrNull()?.let { parseLatLng(it.address) }
+            val firstLatLng = filtered.firstOrNull()?.let { spaceToLatLng(it) }
             val center = firstLatLng ?: userLatLng ?: LatLng(4.65, -74.1)
             val cameraState = rememberCameraPositionState {
-                position = CameraPosition.fromLatLngZoom(center, 12f)
+                position = CameraPosition.fromLatLngZoom(center, 13f)
             }
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
@@ -1082,8 +1095,91 @@ fun ExploreScreen(navController: NavHostController) {
             ) {
                 userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
                 filtered.forEach { s ->
-                    parseLatLng(s.address)?.let { ll ->
-                        Marker(state = MarkerState(position = ll), title = s.title)
+                    spaceToLatLng(s)?.let { ll ->
+                        val markerState = remember(s.id, ll) { MarkerState(position = ll) }
+                        markerState.position = ll
+                        MarkerInfoWindow(
+                            state = markerState,
+                            onClick = {
+                                navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                true
+                            }
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                tonalElevation = 6.dp,
+                                shadowElevation = 12.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .widthIn(min = 180.dp, max = 260.dp)
+                                    .clickable {
+                                        navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                    }
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = s.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    val subtitle = when {
+                                        !s.subtitle.isNullOrBlank() -> s.subtitle
+                                        s.address.isNotBlank() -> s.address
+                                        else -> null
+                                    }
+                                    subtitle?.let {
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                tint = Color(0xFFFFD54F)
+                                            )
+                                            Text(
+                                                text = if (s.rating > 0) String.format(Locale.getDefault(), "%.1f", s.rating) else "N/A",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(start = 4.dp)
+                                            )
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Ver detalles",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowForward,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1292,6 +1388,9 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
+        if (!space.subtitle.isNullOrBlank()) {
+            Text(space.subtitle, color = Color.Gray)
+        }
         Text(space.address, color = Color.Gray)
         Text(space.hour, color = Color.Gray)
         Spacer(modifier = Modifier.height(8.dp))
