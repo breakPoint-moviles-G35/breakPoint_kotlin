@@ -13,13 +13,24 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        // Lee MAPS_API_KEY igual que antes, pero mejor desde local.properties también
+        val lp = com.android.build.gradle.internal.cxx.configure.gradleLocalProperties(rootDir)
+
         // Provide placeholder so manifest merge does not fail when local key isn't set
-        val mapsKey = (project.findProperty("MAPS_API_KEY") as String?)
+        val mapsKey = lp.getProperty("MAPS_API_KEY")
             ?: System.getenv("MAPS_API_KEY")
             ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
-    }
 
+        // Provide backend base URL via local.properties or environment variable, default to localhost
+        val backendBaseUrl = lp.getProperty("BACKEND_BASE_URL")
+            ?: System.getenv("BACKEND_BASE_URL")
+            ?: "http://localhost:3000/"
+
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+    }
+    
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -41,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

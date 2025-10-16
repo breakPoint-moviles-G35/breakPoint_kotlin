@@ -49,29 +49,31 @@ class SpaceRepository {
             // Backend expone 'price' como decimal (string). Es precio por hora.
             (price ?: "0").toDouble().toInt()
         } catch (_: Throwable) { 0 }
-        val latLng = parseGeoToPair(geo)
-        val locationLabel = subtitle ?: geo ?: ""
+        val latLng = parseGeoToLatLng(geo)
         return SpaceItem(
             id = id,
             title = title,
             imageUrl = imageUrl,
-            address = locationLabel,
+            address = geo.orEmpty(),
             hour = "",
             rating = rating_avg ?: 0.0,
             price = hourlyPrice,
+            subtitle = subtitle,
             geo = geo,
             latitude = latLng?.first,
             longitude = latLng?.second
         )
     }
 
-    private fun parseGeoToPair(geo: String?): Pair<Double, Double>? {
-        if (geo.isNullOrBlank()) return null
+    private fun SpaceDto.toNearestItem(): SpaceDto = this
+
+    private fun parseGeoToLatLng(raw: String?): Pair<Double, Double>? {
+        if (raw.isNullOrBlank()) return null
         val regex = Regex("-?\\d+(?:\\.\\d+)?")
-        val numbers = regex.findAll(geo).mapNotNull { it.value.toDoubleOrNull() }.toList()
-        if (numbers.size < 2) return null
-        val a = numbers[0]
-        val b = numbers[1]
+        val components = regex.findAll(raw).mapNotNull { it.value.toDoubleOrNull() }.toList()
+        if (components.size < 2) return null
+        val a = components[0]
+        val b = components[1]
         val lat: Double
         val lng: Double
         if (abs(a) > 90 && abs(b) <= 90) {
@@ -110,6 +112,24 @@ class SpaceRepository {
         return@withContext try {
             val dto = ApiProvider.space.getSpaceDetail(spaceId)
             Result.success(dto.toDetailedSpace())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearest(lat: Double, lng: Double): Result<SpaceDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.space.nearest(lat, lng)
+            Result.success(dto.toNearestItem())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearestList(lat: Double, lng: Double, limit: Int = 5): Result<List<SpaceDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.nearestList(lat, lng, limit)
+            Result.success(list.map { it.toNearestItem() })
         } catch (t: Throwable) {
             Result.failure(t)
         }

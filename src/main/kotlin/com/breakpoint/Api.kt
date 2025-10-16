@@ -31,6 +31,7 @@ data class SpaceDto(
     val id: String,
     val title: String,
     val imageUrl: String?,
+    val subtitle: String? = null,
     val geo: String?,
     val capacity: Int,
     val amenities: List<String>?,
@@ -120,6 +121,19 @@ interface SpaceApi {
 
     @GET("space/{id}")
     suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailFullDto
+
+    @GET("space/nearest")
+    suspend fun nearest(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double
+    ): SpaceDto
+
+    @GET("space/nearest/list")
+    suspend fun nearestList(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double,
+        @Query("limit") limit: Int = 5
+    ): List<SpaceDto>
 }
 
 interface BookingApi {
@@ -175,7 +189,7 @@ class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Inter
 
 object ApiProvider {
     // TODO: adjust baseUrl to your running backend
-    private const val baseUrl = "http://10.0.2.2:3000/" // Android emulator to localhost
+    private const val baseUrl = BuildConfig.BACKEND_BASE_URL  // Android emulator to localhost
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null
