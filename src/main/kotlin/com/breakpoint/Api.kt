@@ -121,6 +121,19 @@ interface SpaceApi {
 
     @GET("space/{id}")
     suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailFullDto
+
+    @GET("space/nearest")
+    suspend fun nearest(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double
+    ): SpaceDto
+
+    @GET("space/nearest/list")
+    suspend fun nearestList(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double,
+        @Query("limit") limit: Int = 5
+    ): List<SpaceDto>
 }
 
 interface BookingApi {

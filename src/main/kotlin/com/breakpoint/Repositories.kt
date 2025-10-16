@@ -65,6 +65,8 @@ class SpaceRepository {
         )
     }
 
+    private fun SpaceDto.toNearestItem(): SpaceDto = this
+
     private fun parseGeoToLatLng(raw: String?): Pair<Double, Double>? {
         if (raw.isNullOrBlank()) return null
         val regex = Regex("-?\\d+(?:\\.\\d+)?")
@@ -110,6 +112,24 @@ class SpaceRepository {
         return@withContext try {
             val dto = ApiProvider.space.getSpaceDetail(spaceId)
             Result.success(dto.toDetailedSpace())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearest(lat: Double, lng: Double): Result<SpaceDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.space.nearest(lat, lng)
+            Result.success(dto.toNearestItem())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearestList(lat: Double, lng: Double, limit: Int = 5): Result<List<SpaceDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.nearestList(lat, lng, limit)
+            Result.success(list.map { it.toNearestItem() })
         } catch (t: Throwable) {
             Result.failure(t)
         }

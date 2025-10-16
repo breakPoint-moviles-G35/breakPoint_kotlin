@@ -51,10 +51,14 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,9 +96,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import java.text.NumberFormat
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -117,18 +123,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.content.pm.PackageManager
+import com.breakpoint.SpaceDto
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerInfoWindow
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import kotlin.math.abs
-import java.text.NumberFormat
 
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
@@ -902,6 +908,11 @@ fun ExploreScreen(navController: NavHostController) {
     val context = LocalContext.current
     var showMap by remember { mutableStateOf(false) }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    var showNearestPanel by remember { mutableStateOf(false) }
+    var nearestSpaces by remember { mutableStateOf<List<NearestSpaceUi>>(emptyList()) }
+    var currentNearestIndex by remember { mutableStateOf(0) }
+    var nearestLoading by remember { mutableStateOf(false) }
+    val accentColor = Color(0xFF5C1B6C)
     val parseLatLngString: (String?) -> LatLng? = { text ->
         if (text.isNullOrBlank()) null else {
             val regex = Regex("-?\\d+(?:\\.\\d+)?")
@@ -1100,6 +1111,14 @@ fun ExploreScreen(navController: NavHostController) {
             }
     val mapContext = LocalContext.current
     var selectedMarkerId by remember { mutableStateOf<String?>(null) }
+    fun focusNearestSpace(space: NearestSpaceUi) {
+        selectedMarkerId = space.dto.id
+        coroutineScope.launch {
+            kotlin.runCatching {
+                cameraState.animate(CameraUpdateFactory.newLatLngZoom(space.latLng, 15f))
+            }
+        }
+    }
     androidx.compose.runtime.LaunchedEffect(showMap) {
         if (showMap && userLatLng == null) {
             val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -1123,6 +1142,13 @@ fun ExploreScreen(navController: NavHostController) {
             }
         }
     }
+    val nearestSelectedId = if (showNearestPanel) nearestSpaces.getOrNull(currentNearestIndex)?.dto?.id else null
+    androidx.compose.runtime.LaunchedEffect(nearestSelectedId, showNearestPanel) {
+        if (showNearestPanel && nearestSelectedId != null) {
+            selectedMarkerId = nearestSelectedId
+        }
+    }
+    val filteredIds = remember(filtered) { filtered.map { it.id }.toSet() }
             Box(modifier = Modifier.fillMaxSize()) {
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
@@ -1163,82 +1189,162 @@ fun ExploreScreen(navController: NavHostController) {
                                     navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
                                 }
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    tonalElevation = 6.dp,
-                                    shadowElevation = 12.dp,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .widthIn(min = 180.dp, max = 260.dp)
-                                        .clickable {
-                                            navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
-                                        }
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = s.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        val subtitle = when {
-                                            !s.subtitle.isNullOrBlank() -> s.subtitle
-                                            s.address.isNotBlank() -> s.address
-                                            else -> null
-                                        }
-                                        subtitle?.let {
-                                            Text(
-                                                text = it,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Star,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFFFFD54F)
-                                                )
-                                                Text(
-                                                    text = if (s.rating > 0) String.format(Locale.getDefault(), "%.1f", s.rating) else "N/A",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    modifier = Modifier.padding(start = 4.dp)
-                                                )
-                                            }
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Ver detalles",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                                Icon(
-                                                    imageVector = Icons.Default.ArrowForward,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
+                                MarkerInfoWindowContent(
+                                    title = s.title,
+                                    subtitle = s.subtitle ?: s.address,
+                                    rating = s.rating,
+                                    onNavigate = {
+                                        navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
                                     }
-                                }
+                                )
                             }
                         }
+                    }
+                    nearestSpaces.forEach { nearest ->
+                        if (!filteredIds.contains(nearest.dto.id)) {
+                            val ll = nearest.latLng
+                            val markerState = remember("nearest-${nearest.dto.id}", ll) { MarkerState(position = ll) }
+                            markerState.position = ll
+                            val isSelected = selectedMarkerId == nearest.dto.id
+                            val priceIcon = remember(nearest.dto.id, nearest.price, isSelected) {
+                                createPriceMarkerBitmapDescriptor(
+                                    context = mapContext,
+                                    price = nearest.price,
+                                    selected = isSelected
+                                )
+                            }
+                            MarkerInfoWindow(
+                                state = markerState,
+                                icon = priceIcon,
+                                onClick = {
+                                    selectedMarkerId = nearest.dto.id
+                                    false
+                                },
+                                onInfoWindowClick = {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(nearest.dto.id))
+                                }
+                            ) {
+                                MarkerInfoWindowContent(
+                                    title = nearest.dto.title,
+                                    subtitle = nearest.dto.subtitle ?: nearest.dto.geo.orEmpty(),
+                                    rating = nearest.dto.rating_avg ?: 0.0,
+                                    onNavigate = {
+                                        navController.navigate(Destinations.DetailedSpace.createRoute(nearest.dto.id))
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp),
+                    shape = MaterialTheme.shapes.large,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 0.dp,
+                    color = Color.White,
+                    onClick = {
+                        if (nearestLoading) return@Surface
+                        coroutineScope.launch {
+                            val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                            val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                                showTopToast(context, "Se requiere permiso de ubicación")
+                                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                return@launch
+                            }
+                            val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                            val fallbackLatLng = LatLng(4.65, -74.1)
+                            val location = kotlin.runCatching { fused.lastLocation.await() }.getOrNull()
+                            val latLng = location?.let { LatLng(it.latitude, it.longitude) } ?: run {
+                                showTopToast(context, "No se pudo obtener tu ubicación, usando un punto por defecto")
+                                fallbackLatLng
+                            }
+                            userLatLng = userLatLng ?: latLng
+                            nearestLoading = true
+                            val result = repo.getNearestList(latLng.latitude, latLng.longitude, limit = 5)
+                            nearestLoading = false
+                            result.fold(onSuccess = { list ->
+                                val validSpaces = list.mapNotNull { dto ->
+                                    val coords = parseLatLngString(dto.geo)
+                                    coords?.let {
+                                        NearestSpaceUi(
+                                            dto = dto,
+                                            latLng = it,
+                                            price = parsePriceToInt(dto.price)
+                                        )
+                                    }
+                                }
+                                if (validSpaces.isEmpty()) {
+                                    showNearestPanel = false
+                                    nearestSpaces = emptyList()
+                                    currentNearestIndex = 0
+                                    showTopToast(context, "No hay espacios cercanos")
+                                } else {
+                                    nearestSpaces = validSpaces
+                                    currentNearestIndex = 0
+                                    showNearestPanel = true
+                                    focusNearestSpace(validSpaces.first())
+                                }
+                            }, onFailure = {
+                                showTopToast(context, it.message ?: "No se pudieron cargar los espacios cercanos")
+                            })
+                        }
+                    },
+                    enabled = !nearestLoading
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Espacios cercanos",
+                            color = accentColor,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (nearestLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+                if (showNearestPanel && nearestSpaces.isNotEmpty()) {
+                    val activeSpace = nearestSpaces.getOrNull(currentNearestIndex)
+                    if (activeSpace != null) {
+                        NearestPanel(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                            space = activeSpace,
+                            accentColor = accentColor,
+                            canMovePrev = currentNearestIndex > 0,
+                            canMoveNext = currentNearestIndex < nearestSpaces.lastIndex,
+                            onPrev = {
+                                if (currentNearestIndex > 0) {
+                                    currentNearestIndex -= 1
+                                    nearestSpaces.getOrNull(currentNearestIndex)?.let { focusNearestSpace(it) }
+                                }
+                            },
+                            onNext = {
+                                if (currentNearestIndex < nearestSpaces.lastIndex) {
+                                    currentNearestIndex += 1
+                                    nearestSpaces.getOrNull(currentNearestIndex)?.let { focusNearestSpace(it) }
+                                }
+                            },
+                            onClose = {
+                                showNearestPanel = false
+                                selectedMarkerId = null
+                            },
+                            onViewDetails = {
+                                navController.navigate(Destinations.DetailedSpace.createRoute(activeSpace.dto.id))
+                            }
+                        )
                     }
                 }
                 Button(
@@ -1922,6 +2028,227 @@ private fun demoReservations(): List<ReservationItem> = listOf(
     ReservationItem("Meeting Room A", "10:00 AM", "Calle 123 #45", 4.8),
     ReservationItem("Open Space", "2:30 PM", "Cra 7 #85", 4.6),
     ReservationItem("Private Office", "9:00 AM", "Av. 68 #30", 4.9)
+)
+
+@Composable
+private fun MarkerInfoWindowContent(
+    title: String,
+    subtitle: String?,
+    rating: Double,
+    onNavigate: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .widthIn(min = 180.dp, max = 260.dp)
+            .clickable { onNavigate() }
+    ) {
+        Column(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD54F)
+                    )
+                    Text(
+                        text = if (rating > 0) String.format(Locale.getDefault(), "%.1f", rating) else "N/A",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Ver detalles",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearestPanel(
+    modifier: Modifier = Modifier,
+    space: NearestSpaceUi,
+    accentColor: Color,
+    canMovePrev: Boolean,
+    canMoveNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+    onViewDetails: () -> Unit
+) {
+    val dto = space.dto
+    val subtitle = dto.subtitle ?: dto.geo.orEmpty()
+    val priceLabel = formatPriceLabel(space.price)
+    val ratingLabel = if ((dto.rating_avg ?: 0.0) > 0) String.format(Locale.getDefault(), "%.1f", dto.rating_avg) else "N/A"
+
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = 12.dp,
+        shadowElevation = 16.dp,
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!dto.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = dto.imageUrl,
+                    contentDescription = dto.title,
+                    modifier = Modifier
+                        .size(112.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(112.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(Color(0xFFE0E0E0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "Sin imagen", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = dto.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = priceLabel,
+                        color = accentColor,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD54F)
+                        )
+                        Text(
+                            text = ratingLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+                Button(
+                    onClick = onViewDetails,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accentColor,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.align(Alignment.Start)
+                ) {
+                    Text("Ver detalles")
+                }
+            }
+            Column(
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.height(112.dp)
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar")
+                }
+                IconButton(onClick = onNext, enabled = canMoveNext) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Siguiente")
+                }
+                IconButton(onClick = onPrev, enabled = canMovePrev) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Anterior")
+                }
+            }
+        }
+    }
+}
+
+private fun parsePriceToInt(price: String?): Int {
+    if (price.isNullOrBlank()) return 0
+    val clean = price.replace(Regex("[^0-9.,-]"), "")
+    val normalized = clean.replace(",", ".")
+    return normalized.toDoubleOrNull()?.toInt() ?: 0
+}
+
+private data class NearestSpaceUi(
+    val dto: SpaceDto,
+    val latLng: LatLng,
+    val price: Int
 )
 
 
