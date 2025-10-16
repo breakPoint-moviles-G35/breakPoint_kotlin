@@ -119,6 +119,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerInfoWindow
@@ -1097,115 +1098,184 @@ fun ExploreScreen(navController: NavHostController) {
             val cameraState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(center, 13f)
             }
-            val mapContext = LocalContext.current
-            var selectedMarkerId by remember { mutableStateOf<String?>(null) }
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState,
-                onMapClick = {
-                    selectedMarkerId = null
+    val mapContext = LocalContext.current
+    var selectedMarkerId by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(showMap) {
+        if (showMap && userLatLng == null) {
+            val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            } else {
+                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                kotlin.runCatching { fused.lastLocation.await() }.getOrNull()?.let { loc ->
+                    userLatLng = LatLng(loc.latitude, loc.longitude)
                 }
-            ) {
-                userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
-                filtered.forEach { s ->
-                    spaceToLatLng(s)?.let { ll ->
-                        val markerState = remember(s.id, ll) { MarkerState(position = ll) }
-                        markerState.position = ll
-                        val isSelected = selectedMarkerId == s.id
-                        val priceIcon = remember(s.id, s.price, isSelected) {
-                            createPriceMarkerBitmapDescriptor(
-                                context = mapContext,
-                                price = s.price,
-                                selected = isSelected
-                            )
-                        }
-                        MarkerInfoWindow(
-                            state = markerState,
-                            icon = priceIcon,
-                            onClick = {
-                                selectedMarkerId = s.id
-                                false
-                            },
-                            onInfoWindowClick = {
-                                navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(showMap, userLatLng) {
+        if (showMap) {
+            userLatLng?.let { target ->
+                kotlin.runCatching {
+                    cameraState.animate(CameraUpdateFactory.newLatLngZoom(target, 15f))
+                }
+            }
+        }
+    }
+            Box(modifier = Modifier.fillMaxSize()) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraState,
+                    onMapClick = {
+                        selectedMarkerId = null
+                    }
+                ) {
+                    userLatLng?.let { location ->
+                        val userIcon = remember(location) { createUserLocationBitmapDescriptor(mapContext) }
+                        Marker(
+                            state = MarkerState(location),
+                            title = "Tú",
+                            icon = userIcon,
+                            zIndex = 1f
+                        )
+                    }
+                    filtered.forEach { s ->
+                        spaceToLatLng(s)?.let { ll ->
+                            val markerState = remember(s.id, ll) { MarkerState(position = ll) }
+                            markerState.position = ll
+                            val isSelected = selectedMarkerId == s.id
+                            val priceIcon = remember(s.id, s.price, isSelected) {
+                                createPriceMarkerBitmapDescriptor(
+                                    context = mapContext,
+                                    price = s.price,
+                                    selected = isSelected
+                                )
                             }
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                tonalElevation = 6.dp,
-                                shadowElevation = 12.dp,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .widthIn(min = 180.dp, max = 260.dp)
-                                    .clickable {
-                                        navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
-                                    }
+                            MarkerInfoWindow(
+                                state = markerState,
+                                icon = priceIcon,
+                                onClick = {
+                                    selectedMarkerId = s.id
+                                    false
+                                },
+                                onInfoWindowClick = {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                }
                             ) {
-                                Column(
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    tonalElevation = 6.dp,
+                                    shadowElevation = 12.dp,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                                     modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .widthIn(min = 180.dp, max = 260.dp)
+                                        .clickable {
+                                            navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                        }
                                 ) {
-                                    Text(
-                                        text = s.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    val subtitle = when {
-                                        !s.subtitle.isNullOrBlank() -> s.subtitle
-                                        s.address.isNotBlank() -> s.address
-                                        else -> null
-                                    }
-                                    subtitle?.let {
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Star,
-                                                contentDescription = null,
-                                                tint = Color(0xFFFFD54F)
-                                            )
+                                        Text(
+                                            text = s.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        val subtitle = when {
+                                            !s.subtitle.isNullOrBlank() -> s.subtitle
+                                            s.address.isNotBlank() -> s.address
+                                            else -> null
+                                        }
+                                        subtitle?.let {
                                             Text(
-                                                text = if (s.rating > 0) String.format(Locale.getDefault(), "%.1f", s.rating) else "N/A",
+                                                text = it,
                                                 style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.padding(start = 4.dp)
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "Ver detalles",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowForward,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFFFD54F)
+                                                )
+                                                Text(
+                                                    text = if (s.rating > 0) String.format(Locale.getDefault(), "%.1f", s.rating) else "N/A",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    modifier = Modifier.padding(start = 4.dp)
+                                                )
+                                            }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Ver detalles",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowForward,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                }
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            val target = userLatLng ?: run {
+                                val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                                val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                                if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                                    permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                    return@launch
+                                }
+                                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                val loc = kotlin.runCatching { fused.lastLocation.await() }.getOrNull()
+                                loc?.let {
+                                    val latLng = LatLng(it.latitude, it.longitude)
+                                    userLatLng = latLng
+                                    latLng
+                                }
+                            }
+                            target?.let {
+                                kotlin.runCatching {
+                                    cameraState.animate(CameraUpdateFactory.newLatLngZoom(it, 15f))
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(30.dp)
+                ) {
+                    Text(text = "Centrar")
                 }
             }
         } else {
@@ -1377,6 +1447,23 @@ private fun formatPriceLabel(price: Int): String {
         val formatter = NumberFormat.getNumberInstance(Locale.getDefault())
         "$${formatter.format(price)}"
     }
+}
+
+private fun createUserLocationBitmapDescriptor(context: Context): BitmapDescriptor {
+    val density = context.resources.displayMetrics.density
+    val size = (16f * density).toInt().coerceAtLeast(12)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#5C1B6C")
+    }
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+    }
+    val center = size / 2f
+    canvas.drawCircle(center, center, center, outerPaint)
+    canvas.drawCircle(center, center, center * 0.55f, innerPaint)
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
 
 @Composable
