@@ -8,6 +8,11 @@ import android.widget.Toast
 import android.view.Gravity
 import android.widget.TextView
 import android.graphics.Color as AndroidColor
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
@@ -119,7 +124,10 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerInfoWindow
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import kotlin.math.abs
+import java.text.NumberFormat
 
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
@@ -1089,17 +1097,35 @@ fun ExploreScreen(navController: NavHostController) {
             val cameraState = rememberCameraPositionState {
                 position = CameraPosition.fromLatLngZoom(center, 13f)
             }
+            val mapContext = LocalContext.current
+            var selectedMarkerId by remember { mutableStateOf<String?>(null) }
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState
+                cameraPositionState = cameraState,
+                onMapClick = {
+                    selectedMarkerId = null
+                }
             ) {
                 userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
                 filtered.forEach { s ->
                     spaceToLatLng(s)?.let { ll ->
                         val markerState = remember(s.id, ll) { MarkerState(position = ll) }
                         markerState.position = ll
+                        val isSelected = selectedMarkerId == s.id
+                        val priceIcon = remember(s.id, s.price, isSelected) {
+                            createPriceMarkerBitmapDescriptor(
+                                context = mapContext,
+                                price = s.price,
+                                selected = isSelected
+                            )
+                        }
                         MarkerInfoWindow(
                             state = markerState,
+                            icon = priceIcon,
+                            onClick = {
+                                selectedMarkerId = s.id
+                                false
+                            },
                             onInfoWindowClick = {
                                 navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
                             }
@@ -1309,6 +1335,47 @@ fun ExploreScreen(navController: NavHostController) {
                 }
             }
         )
+    }
+}
+
+private fun createPriceMarkerBitmapDescriptor(
+    context: Context,
+    price: Int,
+    selected: Boolean
+): BitmapDescriptor {
+    val density = context.resources.displayMetrics.density
+    val horizontalPadding = 12f * density
+    val verticalPadding = 8f * density
+    val cornerRadius = 16f * density
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 14f * density
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        color = if (selected) AndroidColor.WHITE else AndroidColor.parseColor("#5C1B6C")
+    }
+    val priceText = formatPriceLabel(price)
+    val textWidth = textPaint.measureText(priceText)
+    val textHeight = textPaint.fontMetrics.run { descent - ascent }
+    val width = (textWidth + horizontalPadding * 2).toInt().coerceAtLeast((48f * density).toInt())
+    val height = (textHeight + verticalPadding * 2).toInt()
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (selected) AndroidColor.parseColor("#5C1B6C") else AndroidColor.WHITE
+    }
+    val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, backgroundPaint)
+    val textX = (width - textWidth) / 2f
+    val textY = verticalPadding - textPaint.ascent()
+    canvas.drawText(priceText, textX, textY, textPaint)
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+private fun formatPriceLabel(price: Int): String {
+    return if (price <= 0) {
+        "Gratis"
+    } else {
+        val formatter = NumberFormat.getNumberInstance(Locale.getDefault())
+        "$${formatter.format(price)}"
     }
 }
 
