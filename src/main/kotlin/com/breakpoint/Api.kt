@@ -31,6 +31,7 @@ data class SpaceDto(
     val id: String,
     val title: String,
     val imageUrl: String?,
+    val subtitle: String? = null,
     val geo: String?,
     val capacity: Int,
     val amenities: List<String>?,
@@ -175,7 +176,7 @@ class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Inter
 
 object ApiProvider {
     // TODO: adjust baseUrl to your running backend
-    private const val baseUrl = "http://10.0.2.2:3000/" // Android emulator to localhost
+    private const val baseUrl = BuildConfig.BACKEND_BASE_URL  // Android emulator to localhost
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null
