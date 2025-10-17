@@ -1,7 +1,11 @@
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+
 plugins {
     id("com.android.application") version "8.13.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
 }
+
+val localProps = gradleLocalProperties(rootDir, providers)
 
 android {
     namespace = "com.breakpoint"
@@ -15,16 +19,14 @@ android {
         versionName = "1.0"
 
         // Lee MAPS_API_KEY igual que antes, pero mejor desde local.properties también
-        val lp = com.android.build.gradle.internal.cxx.configure.gradleLocalProperties(rootDir)
-
         // Provide placeholder so manifest merge does not fail when local key isn't set
-        val mapsKey = lp.getProperty("MAPS_API_KEY")
+        val mapsKey = localProps.getProperty("MAPS_API_KEY")
             ?: System.getenv("MAPS_API_KEY")
             ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
 
         // Provide backend base URL via local.properties or environment variable, default to localhost
-        val backendBaseUrl = lp.getProperty("BACKEND_BASE_URL")
+        val backendBaseUrl = localProps.getProperty("BACKEND_BASE_URL")
             ?: System.getenv("BACKEND_BASE_URL")
             ?: "http://localhost:3000/"
 
