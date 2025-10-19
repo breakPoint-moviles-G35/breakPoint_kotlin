@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -101,6 +102,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import java.text.NumberFormat
+import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Map
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -387,9 +391,13 @@ private fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations, Destinations.Profile)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val baseIconColor = Color(0xFF5C1B6C)
+    val selectedIndicator = Color(0xFFC6B1C9)
+    val NavBarBg = Color(0xFFF6EAF6)
+
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
+        containerColor = NavBarBg, //Color.White,
+        contentColor = baseIconColor
     ) {
         items.forEach { destination ->
             NavigationBarItem(
@@ -402,18 +410,18 @@ private fun BottomNavigationBar(navController: NavHostController) {
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondary,
-                    selectedTextColor = MaterialTheme.colorScheme.onSecondary,
-                    indicatorColor = MaterialTheme.colorScheme.secondary,
-                    unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
-                    unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                    selectedIconColor = baseIconColor, //Color.White,
+                    selectedTextColor = baseIconColor,
+                    indicatorColor = selectedIndicator,
+                    unselectedIconColor = baseIconColor,
+                    unselectedTextColor = baseIconColor.copy(alpha = 0.85f)
                 ),
                 icon = {
                     val icon = when (destination) {
                         Destinations.Explore -> Icons.Default.Search
                         Destinations.Profile -> Icons.Default.Person
-                        Destinations.Rate,
-                        Destinations.Reservations,
+                        Destinations.Rate -> Icons.Outlined.ChatBubble
+                        Destinations.Reservations -> Icons.Outlined.CalendarMonth
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
@@ -973,6 +981,49 @@ fun ExploreScreen(navController: NavHostController) {
             }
         }
     }
+    fun openMap() {
+        showMap = true
+        coroutineScope.launch {
+            error = null
+            loading = true
+            val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            try {
+                val pm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                if (pm != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                    loading = false
+                    return@launch
+                }
+                val location = fused.lastLocation.await()
+                if (location == null) {
+                    loading = false
+                    error = "No se pudo obtener ubicación"
+                } else {
+                    val lat = location.latitude
+                    val lng = location.longitude
+                    userLatLng = LatLng(lat, lng)
+                    val withDistance = items.map { s ->
+                        val ll = spaceToLatLng(s)
+                        val d = if (ll != null) {
+                            val dLat = Math.toRadians(ll.latitude - lat)
+                            val dLng = Math.toRadians(ll.longitude - lng)
+                            val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                            6371.0 * c // km
+                        } else Double.MAX_VALUE
+                        s to d
+                    }
+                    filtered = withDistance.sortedBy { it.second }.map { it.first }
+                    loading = false
+                }
+            } catch (t: Throwable) {
+                loading = false
+                error = t.message ?: "Error ubicando"
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -1019,63 +1070,6 @@ fun ExploreScreen(navController: NavHostController) {
                 IconButton(onClick = { showDatePicker = true }) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
-            }
-            // Botón: calcular cercanos y ETA caminando
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                shadowElevation = 8.dp,
-                tonalElevation = 0.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .background(Color.White)
-                        .clickable {
-                            showMap = true
-                            coroutineScope.launch {
-                                error = null
-                                loading = true
-                                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                                try {
-                                    // Runtime permission check
-                                    val pm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                                    val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-                                    if (pm != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
-                                        permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                        return@launch
-                                    }
-                                    val location = fused.lastLocation.await()
-                                    if (location == null) {
-                                        loading = false
-                                        error = "No se pudo obtener ubicación"
-                                    } else {
-                                        val lat = location.latitude
-                                        val lng = location.longitude
-                                        userLatLng = LatLng(lat, lng)
-                                        // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
-                                        val withDistance = items.map { s ->
-                                            val ll = spaceToLatLng(s)
-                                            val d = if (ll != null) {
-                                                val dLat = Math.toRadians(ll.latitude - lat)
-                                                val dLng = Math.toRadians(ll.longitude - lng)
-                                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
-                                                val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-                                                6371.0 * c // km
-                                            } else Double.MAX_VALUE
-                                            s to d
-                                        }
-                                        filtered = withDistance.sortedBy { it.second }.map { it.first }
-                                        showMap = true
-                                        loading = false
-                                    }
-                                } catch (t: Throwable) {
-                                    loading = false
-                                    error = t.message ?: "Error ubicando"
-                                }
-                            }
-                        }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) { Text("Cerca de mí") }
             }
         }
 
@@ -1393,8 +1387,41 @@ fun ExploreScreen(navController: NavHostController) {
                     .padding(horizontal = 16.dp)
             ) {
                 item {
-                    Button(onClick = { coroutineScope.launch { loading = true; error = null; val res = repo.getSpaces(); loading=false; res.fold(onSuccess={ items=it; filtered=it }, onFailure={ error=it.message }) } }) {
-                        Text("Actualizar")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(onClick = {
+                            coroutineScope.launch {
+                                loading = true
+                                error = null
+                                val res = repo.getSpaces()
+                                loading = false
+                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                            }
+                        }) {
+                            Text("Actualizar")
+                        }
+                        Button(
+                            onClick = { openMap() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5C1B6C),
+                                contentColor = Color.White
+                            ),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Map,
+                                contentDescription = "Ver mapa",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Ver mapa", fontWeight = FontWeight.Medium)
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
