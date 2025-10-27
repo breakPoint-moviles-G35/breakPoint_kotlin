@@ -16,8 +16,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
@@ -45,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +57,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.launch
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +69,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val accentColor = Color(0xFF5C1B6C)
 
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
@@ -82,7 +87,11 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                 title = { Text("") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = accentColor
+                        )
                     }
                 },
                 actions = {
@@ -90,11 +99,15 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         Icon(
                             if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favorite",
-                            tint = if (isFavorite) Color.Red else Color.Gray
+                            tint = if (isFavorite) accentColor else accentColor.copy(alpha = 0.5f)
                         )
                     }
                     IconButton(onClick = { /* TODO: Share functionality */ }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = accentColor
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -128,12 +141,50 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
         ) {
             // Hero Image
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .background(Color(0xFFE0E0E0))
-                )
+                Column {
+                    val heroImage = s.images.firstOrNull()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        if (heroImage != null) {
+                            AsyncImage(
+                                model = heroImage,
+                                contentDescription = "Imagen principal del espacio",
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFE0E0E0))
+                            )
+                        }
+                    }
+                    if (s.images.size > 1) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(s.images.drop(1)) { imageUrl ->
+                                AsyncImage(
+                                    model = imageUrl,
+                                    contentDescription = "Imagen adicional del espacio",
+                                    modifier = Modifier
+                                        .height(90.dp)
+                                        .width(140.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFE0E0E0)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+                }
             }
             
             // Content
@@ -154,7 +205,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                             modifier = Modifier.weight(1f)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
+                            Icon(Icons.Default.Star, contentDescription = null, tint = accentColor)
                             Text(
                                 text = String.format("%.1f", s.rating),
                                 fontWeight = FontWeight.Bold,
@@ -172,7 +223,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     
                     // Location
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray)
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = accentColor)
                         Text(
                             text = s.fullAddress,
                             color = Color.Gray,
@@ -266,7 +317,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
+                        Icon(Icons.Default.Star, contentDescription = null, tint = accentColor)
                         Text(
                             text = String.format("%.1f", s.hostRating),
                             fontWeight = FontWeight.Bold,
@@ -311,10 +362,11 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
 
 @Composable
 fun DetailItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+    val accentColor = Color(0xFF5C1B6C)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = null, tint = Color.Gray)
+        Icon(icon, contentDescription = null, tint = accentColor)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
@@ -331,6 +383,7 @@ fun DetailItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Str
 
 @Composable
 fun AmenityChip(amenity: String) {
+    val accentColor = Color(0xFF5C1B6C)
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
@@ -344,13 +397,13 @@ fun AmenityChip(amenity: String) {
                 Icons.Default.Wifi,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = accentColor
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = amenity,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
+                color = accentColor
             )
         }
     }

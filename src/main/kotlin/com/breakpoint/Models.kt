@@ -11,7 +11,8 @@ data class SpaceItem(
     val subtitle: String? = null,
     val geo: String? = null,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val dto: SpaceDto? = null
 )
 
 data class DetailedSpace(
@@ -50,3 +51,21 @@ data class ReservationData(
     val totalPrice: Int,
     val guestCount: Int
 )
+
+fun SpaceItem.asSpaceDto(): SpaceDto {
+    dto?.let { return it }
+    val priceText = if (price > 0) price.toString() else null
+    return SpaceDto(
+        id = id,
+        title = title,
+        imageUrl = imageUrl,
+        subtitle = subtitle,
+        geo = geo ?: address,
+        capacity = 0,
+        amenities = null,
+        accessibility = null,
+        rules = null,
+        price = priceText,
+        rating_avg = rating
+    )
+}

@@ -61,7 +61,8 @@ class SpaceRepository {
             subtitle = subtitle,
             geo = geo,
             latitude = latLng?.first,
-            longitude = latLng?.second
+            longitude = latLng?.second,
+            dto = this
         )
     }
 
@@ -138,6 +139,15 @@ class SpaceRepository {
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val list = ApiProvider.space.getSpaces().map { it.toSpaceItem() }
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getRecommendations(userId: String): Result<List<SpaceDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.getRecommendations(userId)
             Result.success(list)
         } catch (t: Throwable) {
             Result.failure(t)

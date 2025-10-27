@@ -124,6 +124,9 @@ interface SpaceApi {
     @GET("space/{id}")
     suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailFullDto
 
+    @GET("space/recommendations/{userId}")
+    suspend fun getRecommendations(@Path("userId") userId: String): List<SpaceDto>
+
     @GET("space/nearest")
     suspend fun nearest(
         @Query("latitude") lat: Double,

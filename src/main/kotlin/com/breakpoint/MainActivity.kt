@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
@@ -78,6 +79,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -925,6 +927,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val repo = remember { SpaceRepository() }
+    val authRepo = remember { AuthRepository() }
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -961,6 +964,14 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
             space.latitude != null && space.longitude != null -> LatLng(space.latitude, space.longitude)
             else -> parseLatLngString(space.geo ?: space.address)
         }
+    }
+    var profileId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val result = authRepo.profile()
+        result.fold(
+            onSuccess = { profileId = it.id },
+            onFailure = { profileId = null }
+        )
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -1071,7 +1082,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    placeholder = { Text("Lorem ipsum?") },
+                    placeholder = { Text("Buscar espacios") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -1408,6 +1419,13 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     .padding(horizontal = 16.dp)
             ) {
                 item {
+                    profileId?.takeIf { it.isNotBlank() }?.let { id ->
+                        RecommendationsBlock(
+                            navController = navController,
+                            userId = id
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1445,11 +1463,25 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Todos los espacios",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
                 items(filtered) { space ->
-                    SpaceCard(space = space, onClick = {
-                        navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
-                    })
+                    SpaceCard(
+                        space = space.asSpaceDto(),
+                        onClick = {
+                            navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        showLocation = false,
+                        showPrice = true,
+                        showDetailsButton = true,
+                        compact = false
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
@@ -1649,65 +1681,155 @@ private fun HourDropdown(label: String, hour: Int?, onHourSelected: (Int) -> Uni
 }
 
 @Composable
-fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
-    Card(
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
-        if (!space.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = space.imageUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(Color(0xFFE0E0E0))
-            )
+fun SpaceCard(
+    space: SpaceDto,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    showLocation: Boolean = false,
+    showPrice: Boolean = true,
+    showDetailsButton: Boolean = true,
+    compact: Boolean = false
+) {
+    val accentColor = Color(0xFF5C1B6C)
+    val imageHeight = if (compact) 160.dp else 220.dp
+    val contentPadding = if (compact) 12.dp else 16.dp
+    val verticalSpacing = if (compact) 8.dp else 12.dp
+    val cardModifier = if (compact) modifier.heightIn(min = 320.dp) else modifier
+    val formattedPrice = remember(space.price) {
+        space.price?.takeIf { it.isNotBlank() }?.let { raw ->
+            runCatching {
+                val cleaned = raw.filter { it.isDigit() }
+                if (cleaned.isBlank()) return@let null
+                val value = cleaned.toLong()
+                val formatter = NumberFormat.getInstance(Locale("es", "CO")).apply {
+                    maximumFractionDigits = 0
+                }
+                "$${formatter.format(value)} / COP"
+            }.getOrNull()
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                space.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, contentDescription = null)
-                Text(
-                    text = String.format(Locale.getDefault(), "%.2f", space.rating),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 8.dp)
+    }
+    val ratingText = space.rating_avg?.takeIf { it > 0 }?.let { rating ->
+        String.format(Locale.getDefault(), "%.1f", rating)
+    }
+    val locationText = space.geo?.takeIf { it.isNotBlank() }
+
+    Card(
+        onClick = onClick,
+        modifier = cardModifier,
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column {
+            if (!space.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = space.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(imageHeight)
+                        .clip(MaterialTheme.shapes.large),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(imageHeight)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(Color(0xFFE0E0E0))
                 )
             }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = contentPadding, vertical = contentPadding)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = space.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    ratingText?.let {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = it,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+
+                space.subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(modifier = Modifier.height(verticalSpacing))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (showLocation) {
+                    locationText?.let {
+                        Spacer(modifier = Modifier.height(verticalSpacing))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (showPrice) {
+                    formattedPrice?.let {
+                        Spacer(modifier = Modifier.height(verticalSpacing))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accentColor
+                        )
+                    }
+                }
+
+                if (showDetailsButton) {
+                    Spacer(modifier = Modifier.height(verticalSpacing))
+                    Button(
+                        onClick = onClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor = Color.White
+                        ),
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        Text(text = "Ver detalles", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        if (!space.subtitle.isNullOrBlank()) {
-            Text(space.subtitle, color = Color.Gray)
-        }
-        Text(space.address, color = Color.Gray)
-        Text(space.hour, color = Color.Gray)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "$$$$",
-            fontWeight = FontWeight.SemiBold,
-            textDecoration = TextDecoration.Underline
-        )
     }
 }
 
