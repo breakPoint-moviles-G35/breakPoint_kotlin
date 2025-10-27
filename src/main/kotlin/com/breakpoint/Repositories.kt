@@ -336,4 +336,15 @@ class BookingRepository {
     }
 }
 
+class ReviewRepository {
+    suspend fun submit(spaceId: String, rating: Int, text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            ApiProvider.review.create(CreateReviewRequest(space_id = spaceId, rating = rating, text = text))
+            Result.success(Unit)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
 

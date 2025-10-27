@@ -13,6 +13,8 @@ import retrofit2.http.Query
 import retrofit2.http.PATCH
 import retrofit2.http.DELETE
 import retrofit2.Response
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -156,6 +158,11 @@ interface BookingApi {
     suspend fun delete(@Path("id") id: String): Response<Unit>
 }
 
+interface ReviewApi {
+    @POST("review")
+    suspend fun create(@Body body: CreateReviewRequest): ReviewDto
+}
+
 data class BookingListItemDto(
     val id: String,
     val status: String,
@@ -172,6 +179,22 @@ data class SpaceSummaryDto(
     val imageUrl: String?,
     val price: String?,
     val capacity: Int?
+)
+
+// Review DTOs
+data class CreateReviewRequest(
+    val space_id: String,
+    val rating: Int,
+    val text: String,
+    val flags: Int? = null
+)
+
+data class ReviewDto(
+    val id: String?,
+    val space_id: String?,
+    val user_id: String?,
+    val rating: Int?,
+    val text: String?
 )
 
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {
@@ -195,10 +218,15 @@ object ApiProvider {
     @Volatile private var onUnauthorized: (() -> Unit)? = null
     @Volatile private var suppressUnauthorizedNav: Boolean = false
 
+    // Event bus simple para navegación post-checkout
+    private val _checkoutFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val checkoutFlow = _checkoutFlow.asSharedFlow()
+
     fun setToken(token: String?) { authToken = token }
     fun setOnUnauthorized(handler: (() -> Unit)?) { onUnauthorized = handler }
     fun currentToken(): String? = authToken
     fun setSuppressUnauthorizedNav(suppress: Boolean) { suppressUnauthorizedNav = suppress }
+    fun triggerCheckoutSuccess(spaceId: String) { _checkoutFlow.tryEmit(spaceId) }
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -232,5 +260,6 @@ object ApiProvider {
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
     val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
+    val review: ReviewApi by lazy { retrofit.create(ReviewApi::class.java) }
 }
 
