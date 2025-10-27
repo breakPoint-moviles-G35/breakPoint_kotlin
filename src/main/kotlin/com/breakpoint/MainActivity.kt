@@ -115,6 +115,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.CoroutineScope
@@ -198,6 +199,11 @@ class MainActivity : ComponentActivity() {
                                     val res = repo.checkout(booking.id)
                                     res.fold(onSuccess = {
                                         showTopToast(this@MainActivity, "Checkout exitoso")
+                                        // Navegar a pantalla de reseña si se conoce el espacio
+                                        val spaceId = booking.space?.id
+                                        if (!spaceId.isNullOrBlank()) {
+                                            ApiProvider.triggerCheckoutSuccess(spaceId)
+                                        }
                                     }, onFailure = {
                                         showTopToast(this@MainActivity, it.message ?: "Error en checkout")
                                     })
@@ -223,7 +229,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun showTopToast(context: Context, message: String) {
+fun showTopToast(context: Context, message: String) {
     fun buildToast(): Toast {
         val toast = Toast(context)
         toast.duration = Toast.LENGTH_LONG
@@ -283,6 +289,12 @@ fun BreakPointApp() {
         navController.navigate(Destinations.Login.route) {
             popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
             launchSingleTop = true
+        }
+    }
+    // Suscribirse a evento de checkout y navegar a reseña
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        ApiProvider.checkoutFlow.collect { spaceId: String ->
+            navController.navigate(Destinations.Review.createRoute(spaceId))
         }
     }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -353,9 +365,14 @@ fun BreakPointApp() {
                 )
             }
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
-            composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
+            composable(Destinations.Map.route) { ExploreScreen(navController, startInMap = true) }
+            
             composable(Destinations.Reservations.route) { ReservationsScreen(navController) }
             composable(Destinations.Profile.route) { ProfileScreen(navController) }
+            composable(Destinations.Review.route) { backStackEntry ->
+                val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
+                ReviewScreen(spaceId = spaceId, navController = navController)
+            }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 DetailedSpaceScreen(spaceId = spaceId, navController = navController)
@@ -373,9 +390,12 @@ sealed class Destinations(val route: String, val label: String) {
     data object Splash : Destinations("splash", "Splash")
     data object Login : Destinations("login", "Login")
     data object Explore : Destinations("explore", "Explore")
-    data object Rate : Destinations("rate", "Rate")
+    data object Map : Destinations("map", "Mapa")
     data object Reservations : Destinations("reservations", "Reservations")
     data object Profile : Destinations("profile", "Profile")
+    data object Review : Destinations("review/{spaceId}", "Review") {
+        fun createRoute(spaceId: String) = "review/$spaceId"
+    }
     data object DetailedSpace : Destinations("detailed_space/{spaceId}", "Space Details") {
         fun createRoute(spaceId: String) = "detailed_space/$spaceId"
     }
@@ -388,7 +408,7 @@ sealed class Destinations(val route: String, val label: String) {
 
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
-    val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations, Destinations.Profile)
+    val items = listOf(Destinations.Explore, Destinations.Map, Destinations.Reservations, Destinations.Profile)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val baseIconColor = Color(0xFF5C1B6C)
@@ -420,8 +440,9 @@ private fun BottomNavigationBar(navController: NavHostController) {
                     val icon = when (destination) {
                         Destinations.Explore -> Icons.Default.Search
                         Destinations.Profile -> Icons.Default.Person
-                        Destinations.Rate -> Icons.Outlined.ChatBubble
+                        Destinations.Map -> Icons.Outlined.Map
                         Destinations.Reservations -> Icons.Outlined.CalendarMonth
+                        Destinations.Review -> Icons.Default.Star
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
@@ -899,7 +920,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExploreScreen(navController: NavHostController) {
+fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false) {
     var query by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -914,7 +935,7 @@ fun ExploreScreen(navController: NavHostController) {
     var startHour by remember { mutableStateOf<Int?>(null) }
     var endHour by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
-    var showMap by remember { mutableStateOf(false) }
+    var showMap by remember { mutableStateOf(startInMap) }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
     var showNearestPanel by remember { mutableStateOf(false) }
     var nearestSpaces by remember { mutableStateOf<List<NearestSpaceUi>>(emptyList()) }
