@@ -336,12 +336,21 @@ fun BreakPointApp() {
                                 popUpTo(Destinations.Splash.route) { inclusive = true }
                                 launchSingleTop = true
                             }
-                        }, onFailure = {
-                            tokenManager.clear()
-                            ApiProvider.setToken(null)
-                            navController.navigate(Destinations.Login.route) {
-                                popUpTo(Destinations.Splash.route) { inclusive = true }
-                                launchSingleTop = true
+                        }, onFailure = { err ->
+                            val isUnauthorized = (err is retrofit2.HttpException && err.code() == 401)
+                            if (isUnauthorized) {
+                                tokenManager.clear()
+                                ApiProvider.setToken(null)
+                                navController.navigate(Destinations.Login.route) {
+                                    popUpTo(Destinations.Splash.route) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            } else {
+                                // Error de red u otro: conservar token y entrar en modo offline
+                                navController.navigate(Destinations.Explore.route) {
+                                    popUpTo(Destinations.Splash.route) { inclusive = true }
+                                    launchSingleTop = true
+                                }
                             }
                         })
                     } else {
