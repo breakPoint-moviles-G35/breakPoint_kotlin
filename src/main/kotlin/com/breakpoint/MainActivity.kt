@@ -1095,7 +1095,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
         }
 
         androidx.compose.runtime.LaunchedEffect(Unit) {
-            val result = repo.getSpaces()
+            val result = repo.getSpacesSortedByPriceCached()
             loading = false
             result.fold(
                 onSuccess = { items = it; filtered = it },
@@ -1113,7 +1113,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 Button(onClick = {
                     coroutineScope.launch {
                         loading = true; error = null
-                        val result = repo.getSpaces()
+                        val result = repo.getSpacesSortedByPriceCached(true)
                         loading = false
                         result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
                     }
@@ -1418,12 +1418,35 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                             coroutineScope.launch {
                                 loading = true
                                 error = null
-                                val res = repo.getSpaces()
+                                val res = repo.getSpacesSortedByPriceCached(true)
                                 loading = false
                                 res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
                             }
                         }) {
                             Text("Actualizar")
+                        }
+                        var showPriceMenu by remember { mutableStateOf(false) }
+                        Box {
+                            Button(onClick = { showPriceMenu = true }) { Text("Precio") }
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showPriceMenu,
+                                onDismissRequest = { showPriceMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Menor a mayor") },
+                                    onClick = {
+                                        showPriceMenu = false
+                                        filtered = items.sortedBy { it.price }
+                                    }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Mayor a menor") },
+                                    onClick = {
+                                        showPriceMenu = false
+                                        filtered = items.sortedByDescending { it.price }
+                                    }
+                                )
+                            }
                         }
                         Button(
                             onClick = { openMap() },
@@ -1700,14 +1723,10 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
         if (!space.subtitle.isNullOrBlank()) {
             Text(space.subtitle, color = Color.Gray)
         }
-        Text(space.address, color = Color.Gray)
-        Text(space.hour, color = Color.Gray)
+        // Ocultar latitud/longitud y hora en la tarjeta principal
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "$$$$",
-            fontWeight = FontWeight.SemiBold,
-            textDecoration = TextDecoration.Underline
-        )
+        val priceLabel = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP"
+        Text(text = priceLabel, fontWeight = FontWeight.SemiBold)
     }
 }
 
