@@ -1,8 +1,23 @@
 package com.breakpoint
 
+import android.content.Intent
+import android.content.Context
 import android.os.Bundle
+import android.nfc.NfcAdapter
+import android.widget.Toast
+import android.view.Gravity
+import android.widget.TextView
+import android.graphics.Color as AndroidColor
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import androidx.core.content.ContextCompat
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,8 +33,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,10 +47,19 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +74,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,9 +97,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import java.text.NumberFormat
+import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Map
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -81,28 +115,141 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
+import com.breakpoint.SpaceDto
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerInfoWindow
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
+    // Debounce de intents NFC para evitar ejecuciones dobles
+    @Volatile private var lastNfcHandledAtMs: Long = 0L
+    private val minNfcIntervalMs: Long = 1500
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             BreakPointTheme { BreakPointApp() }
         }
+        // Manejar intent al abrir por NFC
+        handleNfcIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNfcIntent(intent)
+    }
+
+    private fun handleNfcIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val type = intent.type
+        if (action == NfcAdapter.ACTION_NDEF_DISCOVERED && type == "application/vnd.breakpoint.check") {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastNfcHandledAtMs < minNfcIntervalMs) {
+                return
+            }
+            lastNfcHandledAtMs = now
+            showTopToast(this@MainActivity, "NFC detectado")
+            // Ejecutar en el hilo principal
+            CoroutineScope(Dispatchers.Main).launch {
+                // Asegurar token: si no está en memoria, intenta cargarlo desde DataStore
+                var token = ApiProvider.currentToken()
+                if (token.isNullOrBlank()) {
+                    val tm = TokenManager(this@MainActivity)
+                    token = tm.tokenFlow.firstOrNull()
+                    if (!token.isNullOrBlank()) ApiProvider.setToken(token)
+                }
+                // Durante el flujo NFC, no navegues automáticamente por 401
+                ApiProvider.setSuppressUnauthorizedNav(true)
+                val repo = BookingRepository()
+                val active = repo.findActiveNow()
+                active.fold(onSuccess = { list ->
+                    if (list.isEmpty()) {
+                        showTopToast(this@MainActivity, "No tienes una reserva activa ahora")
+                    } else {
+                        // Si hay varias, toma la primera por ahora (mejorar: selector en UI)
+                        val booking = list.first()
+                        // Confirmación con diálogo nativo
+                        val dlg = android.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Checkout")
+                            .setMessage("¿Confirmas checkout de ${booking.space?.title ?: "tu reserva"}?")
+                            .setPositiveButton("Confirmar") { _, _ ->
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    val res = repo.checkout(booking.id)
+                                    res.fold(onSuccess = {
+                                        showTopToast(this@MainActivity, "Checkout exitoso")
+                                        // Navegar a pantalla de reseña si se conoce el espacio
+                                        val spaceId = booking.space?.id
+                                        if (!spaceId.isNullOrBlank()) {
+                                            ApiProvider.triggerCheckoutSuccess(spaceId)
+                                        }
+                                    }, onFailure = {
+                                        showTopToast(this@MainActivity, it.message ?: "Error en checkout")
+                                    })
+                                }
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .create()
+                        dlg.show()
+                    }
+                }, onFailure = {
+                    val msg = it.message ?: "Error consultando reserva"
+                    showTopToast(this@MainActivity, msg)
+                    if (msg.contains("401") || msg.contains("Unauthorized", ignoreCase = true)) {
+                        showTopToast(this@MainActivity, "Inicia sesión y vuelve a escanear")
+                    }
+                })
+                ApiProvider.setSuppressUnauthorizedNav(false)
+                if (ApiProvider.currentToken().isNullOrBlank()) {
+                    showTopToast(this@MainActivity, "Inicia sesión y vuelve a escanear")
+                }
+            }
+        }
+    }
+}
+
+fun showTopToast(context: Context, message: String) {
+    fun buildToast(): Toast {
+        val toast = Toast(context)
+        toast.duration = Toast.LENGTH_LONG
+        toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 120)
+        val tv = TextView(context)
+        tv.text = message
+        tv.setTextColor(AndroidColor.WHITE)
+        tv.textSize = 16f
+        val bg = ContextCompat.getDrawable(context, R.drawable.toast_bg)
+        tv.background = bg
+        val padH = (24 * context.resources.displayMetrics.density).toInt()
+        val padV = (12 * context.resources.displayMetrics.density).toInt()
+        tv.setPadding(padH, padV, padH, padV)
+        toast.view = tv
+        return toast
+    }
+    buildToast().show()
+    CoroutineScope(Dispatchers.Main).launch {
+        delay(3600)
+        buildToast().apply { duration = Toast.LENGTH_SHORT }.show()
     }
 }
 
@@ -130,11 +277,24 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 @Composable
 fun BreakPointApp() {
     val navController = rememberNavController()
-    // 401 handler: vuelve al login limpiando back stack
+    // 401 handler: limpia token y vuelve al login
+    val ctxUnauthorized = LocalContext.current
+    val tmUnauthorized = remember { TokenManager(ctxUnauthorized) }
+    val scopeUnauthorized = rememberCoroutineScope()
     ApiProvider.setOnUnauthorized {
+        scopeUnauthorized.launch {
+            tmUnauthorized.clear()
+            ApiProvider.setToken(null)
+        }
         navController.navigate(Destinations.Login.route) {
             popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
             launchSingleTop = true
+        }
+    }
+    // Suscribirse a evento de checkout y navegar a reseña
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        ApiProvider.checkoutFlow.collect { spaceId: String ->
+            navController.navigate(Destinations.Review.createRoute(spaceId))
         }
     }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -158,9 +318,42 @@ fun BreakPointApp() {
         }
         NavHost(
             navController = navController,
-            startDestination = Destinations.Login.route,
+            startDestination = Destinations.Splash.route,
             modifier = Modifier.padding(padding)
         ) {
+            composable(Destinations.Splash.route) {
+                val ctx = LocalContext.current
+                val tokenManager = remember { TokenManager(ctx) }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    val token = tokenManager.tokenFlow.firstOrNull()
+                    if (!token.isNullOrBlank()) {
+                        ApiProvider.setToken(token)
+                        // Validar token llamando al backend
+                        val repo = AuthRepository()
+                        val res = repo.profile()
+                        res.fold(onSuccess = {
+                            navController.navigate(Destinations.Explore.route) {
+                                popUpTo(Destinations.Splash.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }, onFailure = {
+                            tokenManager.clear()
+                            ApiProvider.setToken(null)
+                            navController.navigate(Destinations.Login.route) {
+                                popUpTo(Destinations.Splash.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        })
+                    } else {
+                        navController.navigate(Destinations.Login.route) {
+                            popUpTo(Destinations.Splash.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+                // UI simple de carga
+                SimpleCenter(text = "Cargando…")
+            }
             composable(Destinations.Login.route) {
                 LoginScreen(
                     onLoginSuccess = {
@@ -172,43 +365,59 @@ fun BreakPointApp() {
                 )
             }
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
-            composable(Destinations.Rate.route) { SimpleCenter(text = "Rate") }
-            composable(Destinations.Reservations.route) { ReservationsScreen() }
+            composable(Destinations.Map.route) { ExploreScreen(navController, startInMap = true) }
+            
+            composable(Destinations.Reservations.route) { ReservationsScreen(navController) }
             composable(Destinations.Profile.route) { ProfileScreen(navController) }
+            composable(Destinations.Review.route) { backStackEntry ->
+                val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
+                ReviewScreen(spaceId = spaceId, navController = navController)
+            }
             composable(Destinations.DetailedSpace.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 DetailedSpaceScreen(spaceId = spaceId, navController = navController)
             }
             composable(Destinations.ReserveRoom.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
-                ReserveRoomScreen(spaceId = spaceId, navController = navController)
+                val bookingId = backStackEntry.arguments?.getString("bookingId")
+                ReserveRoomScreen(spaceId = spaceId, navController = navController, bookingId = bookingId)
             }
         }
     }
 }
 
 sealed class Destinations(val route: String, val label: String) {
+    data object Splash : Destinations("splash", "Splash")
     data object Login : Destinations("login", "Login")
     data object Explore : Destinations("explore", "Explore")
-    data object Rate : Destinations("rate", "Rate")
+    data object Map : Destinations("map", "Mapa")
     data object Reservations : Destinations("reservations", "Reservations")
     data object Profile : Destinations("profile", "Profile")
+    data object Review : Destinations("review/{spaceId}", "Review") {
+        fun createRoute(spaceId: String) = "review/$spaceId"
+    }
     data object DetailedSpace : Destinations("detailed_space/{spaceId}", "Space Details") {
         fun createRoute(spaceId: String) = "detailed_space/$spaceId"
     }
-    data object ReserveRoom : Destinations("reserve_room/{spaceId}", "Reserve Room") {
-        fun createRoute(spaceId: String) = "reserve_room/$spaceId"
+    data object ReserveRoom : Destinations("reserve_room/{spaceId}?bookingId={bookingId}", "Reserve Room") {
+        fun createRoute(spaceId: String, bookingId: String? = null): String {
+            return if (bookingId.isNullOrBlank()) "reserve_room/$spaceId" else "reserve_room/$spaceId?bookingId=$bookingId"
+        }
     }
 }
 
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
-    val items = listOf(Destinations.Explore, Destinations.Rate, Destinations.Reservations, Destinations.Profile)
+    val items = listOf(Destinations.Explore, Destinations.Map, Destinations.Reservations, Destinations.Profile)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val baseIconColor = Color(0xFF5C1B6C)
+    val selectedIndicator = Color(0xFFC6B1C9)
+    val NavBarBg = Color(0xFFF6EAF6)
+
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
+        containerColor = NavBarBg, //Color.White,
+        contentColor = baseIconColor
     ) {
         items.forEach { destination ->
             NavigationBarItem(
@@ -221,21 +430,23 @@ private fun BottomNavigationBar(navController: NavHostController) {
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondary,
-                    selectedTextColor = MaterialTheme.colorScheme.onSecondary,
-                    indicatorColor = MaterialTheme.colorScheme.secondary,
-                    unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
-                    unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                    selectedIconColor = baseIconColor, //Color.White,
+                    selectedTextColor = baseIconColor,
+                    indicatorColor = selectedIndicator,
+                    unselectedIconColor = baseIconColor,
+                    unselectedTextColor = baseIconColor.copy(alpha = 0.85f)
                 ),
                 icon = {
                     val icon = when (destination) {
                         Destinations.Explore -> Icons.Default.Search
                         Destinations.Profile -> Icons.Default.Person
-                        Destinations.Rate,
-                        Destinations.Reservations,
+                        Destinations.Map -> Icons.Outlined.Map
+                        Destinations.Reservations -> Icons.Outlined.CalendarMonth
+                        Destinations.Review -> Icons.Default.Star
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
-                        Destinations.Login -> Icons.Default.Star
+                        Destinations.Login,
+                        Destinations.Splash -> Icons.Default.Star
                     }
                     Icon(imageVector = icon, contentDescription = destination.label)
                 },
@@ -709,7 +920,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExploreScreen(navController: NavHostController) {
+fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false) {
     var query by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -724,18 +935,31 @@ fun ExploreScreen(navController: NavHostController) {
     var startHour by remember { mutableStateOf<Int?>(null) }
     var endHour by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
-    var showMap by remember { mutableStateOf(false) }
+    var showMap by remember { mutableStateOf(startInMap) }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
-    val parseLatLng: (String) -> LatLng? = { text ->
-        val regex = Regex("-?\\d+(?:\\.\\d+)?")
-        val nums = regex.findAll(text).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
-        if (nums.size < 2) null else {
-            val a = nums[0]
-            val b = nums[1]
-            val lat: Double
-            val lng: Double
-            if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
-            LatLng(lat, lng)
+    var showNearestPanel by remember { mutableStateOf(false) }
+    var nearestSpaces by remember { mutableStateOf<List<NearestSpaceUi>>(emptyList()) }
+    var currentNearestIndex by remember { mutableStateOf(0) }
+    var nearestLoading by remember { mutableStateOf(false) }
+    val accentColor = Color(0xFF5C1B6C)
+    val parseLatLngString: (String?) -> LatLng? = { text ->
+        if (text.isNullOrBlank()) null else {
+            val regex = Regex("-?\\d+(?:\\.\\d+)?")
+            val nums = regex.findAll(text).mapNotNull { it.value.toDoubleOrNull() }.toList()
+            if (nums.size < 2) null else {
+                val a = nums[0]
+                val b = nums[1]
+                val lat: Double
+                val lng: Double
+                if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+                LatLng(lat, lng)
+            }
+        }
+    }
+    val spaceToLatLng: (SpaceItem) -> LatLng? = { space ->
+        when {
+            space.latitude != null && space.longitude != null -> LatLng(space.latitude, space.longitude)
+            else -> parseLatLngString(space.geo ?: space.address)
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -758,13 +982,11 @@ fun ExploreScreen(navController: NavHostController) {
                         val lat = location.latitude
                         val lng = location.longitude
                         val withDistance = items.map { s ->
-                            val parts = s.address.split(",")
-                            val maybeLat = parts.getOrNull(0)?.toDoubleOrNull()
-                            val maybeLng = parts.getOrNull(1)?.toDoubleOrNull()
-                            val d = if (maybeLat != null && maybeLng != null) {
-                                val dLat = Math.toRadians(maybeLat - lat)
-                                val dLng = Math.toRadians(maybeLng - lng)
-                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(maybeLat))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                            val ll = spaceToLatLng(s)
+                            val d = if (ll != null) {
+                                val dLat = Math.toRadians(ll.latitude - lat)
+                                val dLng = Math.toRadians(ll.longitude - lng)
+                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
                                 val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
                                 6371.0 * c
                             } else Double.MAX_VALUE
@@ -780,6 +1002,49 @@ fun ExploreScreen(navController: NavHostController) {
             }
         }
     }
+    fun openMap() {
+        showMap = true
+        coroutineScope.launch {
+            error = null
+            loading = true
+            val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            try {
+                val pm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                if (pm != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                    loading = false
+                    return@launch
+                }
+                val location = fused.lastLocation.await()
+                if (location == null) {
+                    loading = false
+                    error = "No se pudo obtener ubicación"
+                } else {
+                    val lat = location.latitude
+                    val lng = location.longitude
+                    userLatLng = LatLng(lat, lng)
+                    val withDistance = items.map { s ->
+                        val ll = spaceToLatLng(s)
+                        val d = if (ll != null) {
+                            val dLat = Math.toRadians(ll.latitude - lat)
+                            val dLng = Math.toRadians(ll.longitude - lng)
+                            val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
+                            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                            6371.0 * c // km
+                        } else Double.MAX_VALUE
+                        s to d
+                    }
+                    filtered = withDistance.sortedBy { it.second }.map { it.first }
+                    loading = false
+                }
+            } catch (t: Throwable) {
+                loading = false
+                error = t.message ?: "Error ubicando"
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -799,7 +1064,9 @@ fun ExploreScreen(navController: NavHostController) {
                     onValueChange = { 
                         query = it
                         filtered = if (query.isBlank()) items else items.filter { s ->
-                            s.title.contains(query, ignoreCase = true) || s.address.contains(query, ignoreCase = true)
+                            s.title.contains(query, ignoreCase = true) ||
+                                    s.address.contains(query, ignoreCase = true) ||
+                                    (s.subtitle?.contains(query, ignoreCase = true) == true)
                         }
                     },
                     singleLine = true,
@@ -824,62 +1091,6 @@ fun ExploreScreen(navController: NavHostController) {
                 IconButton(onClick = { showDatePicker = true }) {
                     Icon(Icons.Default.Tune, contentDescription = "Filter")
                 }
-            }
-            // Botón: calcular cercanos y ETA caminando
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                shadowElevation = 8.dp,
-                tonalElevation = 0.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .background(Color.White)
-                        .clickable {
-                            coroutineScope.launch {
-                                error = null
-                                loading = true
-                                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                                try {
-                                    // Runtime permission check
-                                    val pm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                                    val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-                                    if (pm != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
-                                        permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                        return@launch
-                                    }
-                                    val location = fused.lastLocation.await()
-                                    if (location == null) {
-                                        loading = false
-                                        error = "No se pudo obtener ubicación"
-                                    } else {
-                                        val lat = location.latitude
-                                        val lng = location.longitude
-                                        userLatLng = LatLng(lat, lng)
-                                        // Ordenar client-side por distancia (aproximada) usando geo si es lat,lng o dejando como está si no
-                                        val withDistance = items.map { s ->
-                                            val ll = parseLatLng(s.address)
-                                            val d = if (ll != null) {
-                                                val dLat = Math.toRadians(ll.latitude - lat)
-                                                val dLng = Math.toRadians(ll.longitude - lng)
-                                                val a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(Math.toRadians(lat))*Math.cos(Math.toRadians(ll.latitude))*Math.sin(dLng/2)*Math.sin(dLng/2)
-                                                val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-                                                6371.0 * c // km
-                                            } else Double.MAX_VALUE
-                                            s to d
-                                        }
-                                        filtered = withDistance.sortedBy { it.second }.map { it.first }
-                                        showMap = true
-                                        loading = false
-                                    }
-                                } catch (t: Throwable) {
-                                    loading = false
-                                    error = t.message ?: "Error ubicando"
-                                }
-                            }
-                        }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) { Text("Cerca de mí") }
             }
         }
 
@@ -909,20 +1120,285 @@ fun ExploreScreen(navController: NavHostController) {
                 }) { Text("Reintentar") }
             }
         } else if (showMap) {
-            val firstLatLng = filtered.firstOrNull()?.let { parseLatLng(it.address) }
+            val firstLatLng = filtered.firstOrNull()?.let { spaceToLatLng(it) }
             val center = firstLatLng ?: userLatLng ?: LatLng(4.65, -74.1)
             val cameraState = rememberCameraPositionState {
-                position = CameraPosition.fromLatLngZoom(center, 12f)
+                position = CameraPosition.fromLatLngZoom(center, 13f)
             }
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState
-            ) {
-                userLatLng?.let { Marker(state = MarkerState(it), title = "Tú") }
-                filtered.forEach { s ->
-                    parseLatLng(s.address)?.let { ll ->
-                        Marker(state = MarkerState(position = ll), title = s.title)
+    val mapContext = LocalContext.current
+    var selectedMarkerId by remember { mutableStateOf<String?>(null) }
+    fun focusNearestSpace(space: NearestSpaceUi) {
+        selectedMarkerId = space.dto.id
+        coroutineScope.launch {
+            kotlin.runCatching {
+                cameraState.animate(CameraUpdateFactory.newLatLngZoom(space.latLng, 15f))
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(showMap) {
+        if (showMap && userLatLng == null) {
+            val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            } else {
+                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                kotlin.runCatching { fused.lastLocation.await() }.getOrNull()?.let { loc ->
+                    userLatLng = LatLng(loc.latitude, loc.longitude)
+                }
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(showMap, userLatLng) {
+        if (showMap) {
+            userLatLng?.let { target ->
+                kotlin.runCatching {
+                    cameraState.animate(CameraUpdateFactory.newLatLngZoom(target, 15f))
+                }
+            }
+        }
+    }
+    val nearestSelectedId = if (showNearestPanel) nearestSpaces.getOrNull(currentNearestIndex)?.dto?.id else null
+    androidx.compose.runtime.LaunchedEffect(nearestSelectedId, showNearestPanel) {
+        if (showNearestPanel && nearestSelectedId != null) {
+            selectedMarkerId = nearestSelectedId
+        }
+    }
+    val filteredIds = remember(filtered) { filtered.map { it.id }.toSet() }
+            Box(modifier = Modifier.fillMaxSize()) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraState,
+                    onMapClick = {
+                        selectedMarkerId = null
                     }
+                ) {
+                    userLatLng?.let { location ->
+                        val userIcon = remember(location) { createUserLocationBitmapDescriptor(mapContext) }
+                        Marker(
+                            state = MarkerState(location),
+                            title = "Tú",
+                            icon = userIcon,
+                            zIndex = 1f
+                        )
+                    }
+                    filtered.forEach { s ->
+                        spaceToLatLng(s)?.let { ll ->
+                            val markerState = remember(s.id, ll) { MarkerState(position = ll) }
+                            markerState.position = ll
+                            val isSelected = selectedMarkerId == s.id
+                            val priceIcon = remember(s.id, s.price, isSelected) {
+                                createPriceMarkerBitmapDescriptor(
+                                    context = mapContext,
+                                    price = s.price,
+                                    selected = isSelected
+                                )
+                            }
+                            MarkerInfoWindow(
+                                state = markerState,
+                                icon = priceIcon,
+                                onClick = {
+                                    selectedMarkerId = s.id
+                                    false
+                                },
+                                onInfoWindowClick = {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                }
+                            ) {
+                                MarkerInfoWindowContent(
+                                    title = s.title,
+                                    subtitle = s.subtitle ?: s.address,
+                                    rating = s.rating,
+                                    onNavigate = {
+                                        navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    nearestSpaces.forEach { nearest ->
+                        if (!filteredIds.contains(nearest.dto.id)) {
+                            val ll = nearest.latLng
+                            val markerState = remember("nearest-${nearest.dto.id}", ll) { MarkerState(position = ll) }
+                            markerState.position = ll
+                            val isSelected = selectedMarkerId == nearest.dto.id
+                            val priceIcon = remember(nearest.dto.id, nearest.price, isSelected) {
+                                createPriceMarkerBitmapDescriptor(
+                                    context = mapContext,
+                                    price = nearest.price,
+                                    selected = isSelected
+                                )
+                            }
+                            MarkerInfoWindow(
+                                state = markerState,
+                                icon = priceIcon,
+                                onClick = {
+                                    selectedMarkerId = nearest.dto.id
+                                    false
+                                },
+                                onInfoWindowClick = {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(nearest.dto.id))
+                                }
+                            ) {
+                                MarkerInfoWindowContent(
+                                    title = nearest.dto.title,
+                                    subtitle = nearest.dto.subtitle ?: nearest.dto.geo.orEmpty(),
+                                    rating = nearest.dto.rating_avg ?: 0.0,
+                                    onNavigate = {
+                                        navController.navigate(Destinations.DetailedSpace.createRoute(nearest.dto.id))
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp),
+                    shape = MaterialTheme.shapes.large,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 0.dp,
+                    color = Color.White,
+                    onClick = {
+                        if (nearestLoading) return@Surface
+                        coroutineScope.launch {
+                            val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                            val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                                showTopToast(context, "Se requiere permiso de ubicación")
+                                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                return@launch
+                            }
+                            val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                            val fallbackLatLng = LatLng(4.65, -74.1)
+                            val location = kotlin.runCatching { fused.lastLocation.await() }.getOrNull()
+                            val latLng = location?.let { LatLng(it.latitude, it.longitude) } ?: run {
+                                showTopToast(context, "No se pudo obtener tu ubicación, usando un punto por defecto")
+                                fallbackLatLng
+                            }
+                            userLatLng = userLatLng ?: latLng
+                            nearestLoading = true
+                            val result = repo.getNearestList(latLng.latitude, latLng.longitude, limit = 5)
+                            nearestLoading = false
+                            result.fold(onSuccess = { list ->
+                                val validSpaces = list.mapNotNull { dto ->
+                                    val coords = parseLatLngString(dto.geo)
+                                    coords?.let {
+                                        NearestSpaceUi(
+                                            dto = dto,
+                                            latLng = it,
+                                            price = parsePriceToInt(dto.price)
+                                        )
+                                    }
+                                }
+                                if (validSpaces.isEmpty()) {
+                                    showNearestPanel = false
+                                    nearestSpaces = emptyList()
+                                    currentNearestIndex = 0
+                                    showTopToast(context, "No hay espacios cercanos")
+                                } else {
+                                    nearestSpaces = validSpaces
+                                    currentNearestIndex = 0
+                                    showNearestPanel = true
+                                    focusNearestSpace(validSpaces.first())
+                                }
+                            }, onFailure = {
+                                showTopToast(context, it.message ?: "No se pudieron cargar los espacios cercanos")
+                            })
+                        }
+                    },
+                    enabled = !nearestLoading
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Espacios cercanos",
+                            color = accentColor,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (nearestLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+                if (showNearestPanel && nearestSpaces.isNotEmpty()) {
+                    val activeSpace = nearestSpaces.getOrNull(currentNearestIndex)
+                    if (activeSpace != null) {
+                        NearestPanel(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 12.dp, vertical = 0.dp)
+                                .padding(bottom = 24.dp),
+                            space = activeSpace,
+                            accentColor = accentColor,
+                            canMovePrev = currentNearestIndex > 0,
+                            canMoveNext = currentNearestIndex < nearestSpaces.lastIndex,
+                            onPrev = {
+                                if (currentNearestIndex > 0) {
+                                    currentNearestIndex -= 1
+                                    nearestSpaces.getOrNull(currentNearestIndex)?.let { focusNearestSpace(it) }
+                                }
+                            },
+                            onNext = {
+                                if (currentNearestIndex < nearestSpaces.lastIndex) {
+                                    currentNearestIndex += 1
+                                    nearestSpaces.getOrNull(currentNearestIndex)?.let { focusNearestSpace(it) }
+                                }
+                            },
+                            onClose = {
+                                showNearestPanel = false
+                                selectedMarkerId = null
+                            },
+                            onViewDetails = {
+                                navController.navigate(Destinations.DetailedSpace.createRoute(activeSpace.dto.id))
+                            }
+                        )
+                    }
+                }
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            val target = userLatLng ?: run {
+                                val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                                val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                                if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
+                                    permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                    return@launch
+                                }
+                                val fused = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                val loc = kotlin.runCatching { fused.lastLocation.await() }.getOrNull()
+                                loc?.let {
+                                    val latLng = LatLng(it.latitude, it.longitude)
+                                    userLatLng = latLng
+                                    latLng
+                                }
+                            }
+                            target?.let {
+                                kotlin.runCatching {
+                                    cameraState.animate(CameraUpdateFactory.newLatLngZoom(it, 15f))
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(30.dp)
+                ) {
+                    Text(text = "Centrar")
                 }
             }
         } else {
@@ -932,8 +1408,41 @@ fun ExploreScreen(navController: NavHostController) {
                     .padding(horizontal = 16.dp)
             ) {
                 item {
-                    Button(onClick = { coroutineScope.launch { loading = true; error = null; val res = repo.getSpaces(); loading=false; res.fold(onSuccess={ items=it; filtered=it }, onFailure={ error=it.message }) } }) {
-                        Text("Actualizar")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(onClick = {
+                            coroutineScope.launch {
+                                loading = true
+                                error = null
+                                val res = repo.getSpaces()
+                                loading = false
+                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                            }
+                        }) {
+                            Text("Actualizar")
+                        }
+                        Button(
+                            onClick = { openMap() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5C1B6C),
+                                contentColor = Color.White
+                            ),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Map,
+                                contentDescription = "Ver mapa",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Ver mapa", fontWeight = FontWeight.Medium)
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
@@ -1055,6 +1564,64 @@ fun ExploreScreen(navController: NavHostController) {
     }
 }
 
+private fun createPriceMarkerBitmapDescriptor(
+    context: Context,
+    price: Int,
+    selected: Boolean
+): BitmapDescriptor {
+    val density = context.resources.displayMetrics.density
+    val horizontalPadding = 12f * density
+    val verticalPadding = 8f * density
+    val cornerRadius = 16f * density
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 14f * density
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        color = if (selected) AndroidColor.WHITE else AndroidColor.parseColor("#5C1B6C")
+    }
+    val priceText = formatPriceLabel(price)
+    val textWidth = textPaint.measureText(priceText)
+    val textHeight = textPaint.fontMetrics.run { descent - ascent }
+    val width = (textWidth + horizontalPadding * 2).toInt().coerceAtLeast((48f * density).toInt())
+    val height = (textHeight + verticalPadding * 2).toInt()
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (selected) AndroidColor.parseColor("#5C1B6C") else AndroidColor.WHITE
+    }
+    val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, backgroundPaint)
+    val textX = (width - textWidth) / 2f
+    val textY = verticalPadding - textPaint.ascent()
+    canvas.drawText(priceText, textX, textY, textPaint)
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+private fun formatPriceLabel(price: Int): String {
+    return if (price <= 0) {
+        "Gratis"
+    } else {
+        val formatter = NumberFormat.getNumberInstance(Locale.getDefault())
+        "$${formatter.format(price)}"
+    }
+}
+
+private fun createUserLocationBitmapDescriptor(context: Context): BitmapDescriptor {
+    val density = context.resources.displayMetrics.density
+    val size = (16f * density).toInt().coerceAtLeast(12)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#5C1B6C")
+    }
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+    }
+    val center = size / 2f
+    canvas.drawCircle(center, center, center, outerPaint)
+    canvas.drawCircle(center, center, center * 0.55f, innerPaint)
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
 @Composable
 private fun HourDropdown(label: String, hour: Int?, onHourSelected: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -1130,6 +1697,9 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
+        if (!space.subtitle.isNullOrBlank()) {
+            Text(space.subtitle, color = Color.Gray)
+        }
         Text(space.address, color = Color.Gray)
         Text(space.hour, color = Color.Gray)
         Spacer(modifier = Modifier.height(8.dp))
@@ -1161,7 +1731,7 @@ private fun RateScreen() {
 }
 
 @Composable
-fun ReservationsScreen() {
+fun ReservationsScreen(navController: NavHostController) {
     val repo = remember { BookingRepository() }
     var query by remember { mutableStateOf("") }
     var items by remember { mutableStateOf<List<BookingListItemDto>>(emptyList()) }
@@ -1236,7 +1806,16 @@ fun ReservationsScreen() {
                     .padding(horizontal = 16.dp)
             ) {
                 items(filtered) { booking ->
-                    BookingCard(booking)
+                    BookingCard(
+                        booking = booking,
+                        onDeleted = { id ->
+                            items = items.filter { it.id != id }
+                            filtered = filtered.filter { it.id != id }
+                        },
+                        onEdit = { spaceId, bookingId ->
+                            navController.navigate(Destinations.ReserveRoom.createRoute(spaceId, bookingId))
+                        }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.material3.Divider()
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1247,7 +1826,11 @@ fun ReservationsScreen() {
 }
 
 @Composable
-private fun BookingCard(booking: BookingListItemDto) {
+private fun BookingCard(
+    booking: BookingListItemDto,
+    onDeleted: (String) -> Unit = {},
+    onEdit: (String, String) -> Unit = { _, _ -> }
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1295,6 +1878,65 @@ private fun BookingCard(booking: BookingListItemDto) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(amount, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             }
+        }
+
+        // Botones Editar y Eliminar
+        val scope = rememberCoroutineScope()
+        val repo = remember { BookingRepository() }
+        val context = LocalContext.current
+        var showEditDialog by remember { mutableStateOf(false) }
+        var newEndIso by remember { mutableStateOf(booking.slotEnd) }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            IconButton(onClick = {
+                val sid = booking.space?.id ?: return@IconButton
+                onEdit(sid, booking.id)
+            }) {
+                Icon(Icons.Filled.Edit, contentDescription = "Editar")
+            }
+            IconButton(onClick = {
+                scope.launch {
+                    val res = repo.deleteBooking(booking.id)
+                    res.fold(
+                        onSuccess = {
+                            showTopToast(context, "Reserva eliminada")
+                            onDeleted(booking.id)
+                        },
+                        onFailure = { showTopToast(context, it.message ?: "No se pudo eliminar") }
+                    )
+                }
+            }) {
+                Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
+            }
+        }
+
+        if (showEditDialog) {
+            AlertDialog(
+                onDismissRequest = { showEditDialog = false },
+                title = { Text("Editar reserva") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Nueva hora de fin (ISO 8601)")
+                        TextField(
+                            value = newEndIso,
+                            onValueChange = { newEndIso = it },
+                            singleLine = true,
+                            placeholder = { Text("yyyy-MM-dd'T'HH:mm:ss'Z'") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showEditDialog = false
+                        scope.launch {
+                            val res = repo.updateBooking(booking.id, slotEndIso = newEndIso)
+                            res.fold(onSuccess = { showTopToast(context, "Reserva actualizada") }, onFailure = { showTopToast(context, it.message ?: "Error al actualizar") })
+                        }
+                    }) { Text("Guardar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditDialog = false }) { Text("Cancelar") }
+                }
+            )
         }
     }
 }
@@ -1436,6 +2078,233 @@ private fun demoReservations(): List<ReservationItem> = listOf(
     ReservationItem("Meeting Room A", "10:00 AM", "Calle 123 #45", 4.8),
     ReservationItem("Open Space", "2:30 PM", "Cra 7 #85", 4.6),
     ReservationItem("Private Office", "9:00 AM", "Av. 68 #30", 4.9)
+)
+
+@Composable
+private fun MarkerInfoWindowContent(
+    title: String,
+    subtitle: String?,
+    rating: Double,
+    onNavigate: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .widthIn(min = 180.dp, max = 260.dp)
+            .clickable { onNavigate() }
+    ) {
+        Column(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD54F)
+                    )
+                    Text(
+                        text = if (rating > 0) String.format(Locale.getDefault(), "%.1f", rating) else "N/A",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Ver detalles",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearestPanel(
+    modifier: Modifier = Modifier,
+    space: NearestSpaceUi,
+    accentColor: Color,
+    canMovePrev: Boolean,
+    canMoveNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+    onViewDetails: () -> Unit
+) {
+    val dto = space.dto
+    val subtitle = dto.subtitle ?: dto.geo.orEmpty()
+    val priceLabel = formatPriceLabel(space.price)
+    val ratingLabel = if ((dto.rating_avg ?: 0.0) > 0) String.format(Locale.getDefault(), "%.1f", dto.rating_avg) else "N/A"
+
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = 12.dp,
+        shadowElevation = 16.dp,
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!dto.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = dto.imageUrl,
+                        contentDescription = dto.title,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(MaterialTheme.shapes.medium),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(Color(0xFFE0E0E0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Sin imagen", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = dto.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = priceLabel,
+                            color = accentColor,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F)
+                            )
+                            Text(
+                                text = ratingLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = onViewDetails,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Ver detalles")
+                    }
+                }
+            }
+            Column(
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .height(120.dp)
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar")
+                }
+                IconButton(onClick = onNext, enabled = canMoveNext) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Siguiente")
+                }
+                IconButton(onClick = onPrev, enabled = canMovePrev) {
+                    Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Anterior")
+                }
+            }
+        }
+    }
+}
+
+private fun parsePriceToInt(price: String?): Int {
+    if (price.isNullOrBlank()) return 0
+    val clean = price.replace(Regex("[^0-9.,-]"), "")
+    val normalized = clean.replace(",", ".")
+    return normalized.toDoubleOrNull()?.toInt() ?: 0
+}
+
+private data class NearestSpaceUi(
+    val dto: SpaceDto,
+    val latLng: LatLng,
+    val price: Int
 )
 
 

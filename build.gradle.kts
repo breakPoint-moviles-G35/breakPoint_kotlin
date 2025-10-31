@@ -1,7 +1,11 @@
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+
 plugins {
-    id("com.android.application") version "8.2.2"
+    id("com.android.application") version "8.13.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
 }
+
+val localProps = gradleLocalProperties(rootDir, providers)
 
 android {
     namespace = "com.breakpoint"
@@ -13,13 +17,22 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        // Lee MAPS_API_KEY igual que antes, pero mejor desde local.properties también
         // Provide placeholder so manifest merge does not fail when local key isn't set
-        val mapsKey = (project.findProperty("MAPS_API_KEY") as String?)
+        val mapsKey = localProps.getProperty("MAPS_API_KEY")
             ?: System.getenv("MAPS_API_KEY")
             ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
-    }
 
+        // Provide backend base URL via local.properties or environment variable, default to localhost
+        val backendBaseUrl = localProps.getProperty("BACKEND_BASE_URL")
+            ?: System.getenv("BACKEND_BASE_URL")
+            ?: "http://localhost:3000/"
+
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+    }
+    
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -41,6 +54,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -89,6 +103,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Lifecycle (para lifecycleScope en Activity)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")

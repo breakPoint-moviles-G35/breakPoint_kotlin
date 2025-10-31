@@ -3,6 +3,7 @@ package com.breakpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
+import kotlin.math.abs
 
 class AuthRepository {
     suspend fun login(email: String, password: String): Result<UserDto> = withContext(Dispatchers.IO) {
@@ -48,15 +49,90 @@ class SpaceRepository {
             // Backend expone 'price' como decimal (string). Es precio por hora.
             (price ?: "0").toDouble().toInt()
         } catch (_: Throwable) { 0 }
+        val latLng = parseGeoToLatLng(geo)
         return SpaceItem(
             id = id,
             title = title,
             imageUrl = imageUrl,
-            address = geo ?: "",
+            address = geo.orEmpty(),
             hour = "",
             rating = rating_avg ?: 0.0,
-            price = hourlyPrice
+            price = hourlyPrice,
+            subtitle = subtitle,
+            geo = geo,
+            latitude = latLng?.first,
+            longitude = latLng?.second
         )
+    }
+
+    private fun SpaceDto.toNearestItem(): SpaceDto = this
+
+    private fun parseGeoToLatLng(raw: String?): Pair<Double, Double>? {
+        if (raw.isNullOrBlank()) return null
+        val regex = Regex("-?\\d+(?:\\.\\d+)?")
+        val components = regex.findAll(raw).mapNotNull { it.value.toDoubleOrNull() }.toList()
+        if (components.size < 2) return null
+        val a = components[0]
+        val b = components[1]
+        val lat: Double
+        val lng: Double
+        if (abs(a) > 90 && abs(b) <= 90) {
+            lat = b; lng = a
+        } else {
+            lat = a; lng = b
+        }
+        return lat to lng
+    }
+
+    private fun SpaceDetailFullDto.toDetailedSpace(): DetailedSpace {
+        val hourlyPrice = try { (price ?: "0").toDouble().toInt() } catch (_: Throwable) { 0 }
+        val fullAddress = geo ?: ""
+        val hostName = hostProfile?.id?.let { "Host ${it.take(4)}" } ?: "Host"
+        return DetailedSpace(
+            id = id,
+            title = title,
+            address = fullAddress,
+            fullAddress = fullAddress,
+            hour = "",
+            rating = rating_avg ?: 0.0,
+            reviewCount = bookings?.size ?: 0,
+            price = hourlyPrice,
+            description = rules ?: "",
+            amenities = amenities ?: emptyList(),
+            images = listOfNotNull(imageUrl),
+            hostName = hostName,
+            hostRating = (rating_avg ?: 0.0).coerceAtMost(5.0),
+            availability = "",
+            capacity = capacity,
+            size = ""
+        )
+    }
+
+    suspend fun getSpace(spaceId: String): Result<DetailedSpace> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.space.getSpaceDetail(spaceId)
+            Result.success(dto.toDetailedSpace())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearest(lat: Double, lng: Double): Result<SpaceDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.space.nearest(lat, lng)
+            Result.success(dto.toNearestItem())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun getNearestList(lat: Double, lng: Double, limit: Int = 5): Result<List<SpaceDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.nearestList(lat, lng, limit)
+            Result.success(list.map { it.toNearestItem() })
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
     }
 
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
@@ -211,6 +287,61 @@ class BookingRepository {
                     return@withContext Result.failure(IllegalStateException("Esa hora no está disponible. Por favor selecciona otra."))
                 }
             }
+            Result.failure(t)
+        }
+    }
+
+    suspend fun findActiveNow(): Result<List<BookingListItemDto>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.booking.activeNow()
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun checkout(bookingId: String): Result<BookingDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val res = ApiProvider.booking.checkout(bookingId)
+            Result.success(res)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun updateBooking(
+        bookingId: String,
+        slotStartIso: String? = null,
+        slotEndIso: String? = null,
+        status: String? = null
+    ): Result<BookingDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val dto = ApiProvider.booking.update(
+                bookingId,
+                UpdateBookingRequest(slotStartIso, slotEndIso, status)
+            )
+            Result.success(dto)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun deleteBooking(bookingId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val resp = ApiProvider.booking.delete(bookingId)
+            if (resp.isSuccessful) Result.success(Unit) else Result.failure(IllegalStateException("No se pudo eliminar"))
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
+class ReviewRepository {
+    suspend fun submit(spaceId: String, rating: Int, text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            ApiProvider.review.create(CreateReviewRequest(space_id = spaceId, rating = rating, text = text))
+            Result.success(Unit)
+        } catch (t: Throwable) {
             Result.failure(t)
         }
     }

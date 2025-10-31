@@ -7,7 +7,11 @@ data class SpaceItem(
     val address: String,
     val hour: String,
     val rating: Double,
-    val price: Int
+    val price: Int,
+    val subtitle: String? = null,
+    val geo: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 data class DetailedSpace(

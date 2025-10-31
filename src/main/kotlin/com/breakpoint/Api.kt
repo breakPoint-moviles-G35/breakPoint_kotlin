@@ -10,6 +10,11 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.PATCH
+import retrofit2.http.DELETE
+import retrofit2.Response
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -28,6 +33,7 @@ data class SpaceDto(
     val id: String,
     val title: String,
     val imageUrl: String?,
+    val subtitle: String? = null,
     val geo: String?,
     val capacity: Int,
     val amenities: List<String>?,
@@ -49,6 +55,29 @@ data class SpaceDetailDto(
     val bookings: List<SpaceBookingDto>?
 )
 
+// Full detail mirroring backend Space entity (only fields we use on the app)
+data class HostProfileDto(
+    val id: String?,
+    val verification_status: String?,
+    val payout_method: String?
+)
+
+data class SpaceDetailFullDto(
+    val id: String,
+    val title: String,
+    val subtitle: String?,
+    val imageUrl: String?,
+    val geo: String?,
+    val capacity: Int,
+    val amenities: List<String>?,
+    val accessibility: List<String>?,
+    val rules: String?,
+    val price: String?,
+    val rating_avg: Double?,
+    val bookings: List<SpaceBookingDto>?,
+    val hostProfile: HostProfileDto?
+)
+
 // Booking
 data class CreateBookingRequest(
     val spaceId: String,
@@ -60,6 +89,12 @@ data class CreateBookingRequest(
 data class BookingDto(
     val id: String,
     val status: String
+)
+
+data class UpdateBookingRequest(
+    val slotStart: String? = null,
+    val slotEnd: String? = null,
+    val status: String? = null
 )
 
 interface AuthApi {
@@ -87,7 +122,20 @@ interface SpaceApi {
     ): List<SpaceDto>
 
     @GET("space/{id}")
-    suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailDto
+    suspend fun getSpaceDetail(@Path("id") id: String): SpaceDetailFullDto
+
+    @GET("space/nearest")
+    suspend fun nearest(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double
+    ): SpaceDto
+
+    @GET("space/nearest/list")
+    suspend fun nearestList(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lng: Double,
+        @Query("limit") limit: Int = 5
+    ): List<SpaceDto>
 }
 
 interface BookingApi {
@@ -96,6 +144,23 @@ interface BookingApi {
 
     @GET("booking")
     suspend fun listMine(): List<BookingListItemDto>
+
+    @GET("booking/active-now")
+    suspend fun activeNow(): List<BookingListItemDto>
+
+    @POST("booking/{id}/checkout")
+    suspend fun checkout(@Path("id") id: String): BookingDto
+
+    @PATCH("booking/{id}")
+    suspend fun update(@Path("id") id: String, @Body body: UpdateBookingRequest): BookingDto
+
+    @DELETE("booking/{id}")
+    suspend fun delete(@Path("id") id: String): Response<Unit>
+}
+
+interface ReviewApi {
+    @POST("review")
+    suspend fun create(@Body body: CreateReviewRequest): ReviewDto
 }
 
 data class BookingListItemDto(
@@ -116,6 +181,22 @@ data class SpaceSummaryDto(
     val capacity: Int?
 )
 
+// Review DTOs
+data class CreateReviewRequest(
+    val space_id: String,
+    val rating: Int,
+    val text: String,
+    val flags: Int? = null
+)
+
+data class ReviewDto(
+    val id: String?,
+    val space_id: String?,
+    val user_id: String?,
+    val rating: Int?,
+    val text: String?
+)
+
 class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
         val token = tokenProvider()
@@ -131,14 +212,21 @@ class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Inter
 
 object ApiProvider {
     // TODO: adjust baseUrl to your running backend
-    private const val baseUrl = "http://10.0.2.2:3000/" // Android emulator to localhost
+    private const val baseUrl = BuildConfig.BACKEND_BASE_URL  // Android emulator to localhost
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null
+    @Volatile private var suppressUnauthorizedNav: Boolean = false
+
+    // Event bus simple para navegación post-checkout
+    private val _checkoutFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val checkoutFlow = _checkoutFlow.asSharedFlow()
 
     fun setToken(token: String?) { authToken = token }
     fun setOnUnauthorized(handler: (() -> Unit)?) { onUnauthorized = handler }
     fun currentToken(): String? = authToken
+    fun setSuppressUnauthorizedNav(suppress: Boolean) { suppressUnauthorizedNav = suppress }
+    fun triggerCheckoutSuccess(spaceId: String) { _checkoutFlow.tryEmit(spaceId) }
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -153,7 +241,7 @@ object ApiProvider {
                     }.build()
                 )
                 if (response.code == 401) {
-                    onUnauthorized?.invoke()
+                    if (!suppressUnauthorizedNav) onUnauthorized?.invoke()
                 }
                 response
             }
@@ -172,4 +260,5 @@ object ApiProvider {
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
     val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
+    val review: ReviewApi by lazy { retrofit.create(ReviewApi::class.java) }
 }

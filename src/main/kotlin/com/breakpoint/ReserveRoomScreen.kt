@@ -41,6 +41,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -70,8 +71,10 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
-    val space = remember { getDetailedSpace(spaceId) }
+fun ReserveRoomScreen(spaceId: String, navController: NavHostController, bookingId: String? = null) {
+    var space by remember { mutableStateOf<DetailedSpace?>(null) }
+    var spaceError by remember { mutableStateOf<String?>(null) }
+    var spaceLoading by remember { mutableStateOf(true) }
     var selectedDate by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf(1) }
@@ -83,7 +86,13 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     
-    val totalPrice = space.price * duration
+    LaunchedEffect(spaceId) {
+        val repo = SpaceRepository()
+        spaceLoading = true; spaceError = null
+        val res = repo.getSpace(spaceId)
+        spaceLoading = false
+        res.fold(onSuccess = { space = it }, onFailure = { spaceError = it.message ?: "Error cargando espacio" })
+    }
     
     Scaffold(
         topBar = {
@@ -102,6 +111,16 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
             )
         }
     ) { paddingValues ->
+        val s = space
+        if (spaceLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Cargando espacio...") }
+            return@Scaffold
+        }
+        if (spaceError != null || s == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(spaceError ?: "No se pudo cargar el espacio") }
+            return@Scaffold
+        }
+        val totalPrice = s.price * duration
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -119,13 +138,13 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = space.title,
+                            text = s.title,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = space.fullAddress,
+                            text = s.fullAddress,
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -135,12 +154,12 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                         ) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700))
                             Text(
-                                text = String.format("%.1f", space.rating),
+                                text = String.format("%.1f", s.rating),
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                             Text(
-                                text = "(${space.reviewCount})",
+                                text = "(${s.reviewCount})",
                                 color = Color.Gray,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
@@ -205,7 +224,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                 Spacer(modifier = Modifier.height(12.dp))
                 GuestCountSelector(
                     guestCount = guestCount,
-                    maxGuests = space.capacity,
+                    maxGuests = s.capacity,
                     onGuestCountChange = { guestCount = it }
                 )
             }
@@ -230,7 +249,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "$${space.price}",
+                                text = "$${s.price}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
@@ -306,11 +325,15 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController) {
                                 val zone = ZoneId.systemDefault()
                                 val startIso = startLdt.atZone(zone).toInstant().toString()
                                 val endIso = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant().toString()
-                                val res = repo.createBooking(spaceId, startIso, endIso, guestCount)
+                                val res = if (bookingId.isNullOrBlank()) {
+                                    repo.createBooking(spaceId, startIso, endIso, guestCount)
+                                } else {
+                                    repo.updateBooking(bookingId, slotStartIso = startIso, slotEndIso = endIso)
+                                }
                                 loading = false
                                 res.fold(
                                     onSuccess = {
-                                        success = "Tu reserva fue creada exitosamente."
+                                        success = if (bookingId.isNullOrBlank()) "Tu reserva fue creada exitosamente." else "Tu reserva fue actualizada."
                                     },
                                     onFailure = {
                                         error = it.message ?: "Error creando reserva"
@@ -419,8 +442,9 @@ fun DateChip(date: String, isSelected: Boolean, onClick: () -> Unit) {
 fun TimeSelector(selectedTime: String, onTimeSelected: (String) -> Unit) {
     val timeSlots = remember {
         listOf(
-            "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-            "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM"
+            "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+            "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM",
+            "11:00 PM", "12:00 AM", "1:00 AM"
         )
     }
     
