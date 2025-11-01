@@ -71,7 +71,20 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
         loading = true; error = null
         val res = repo.getSpace(spaceId)
         loading = false
-        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+        res.fold(onSuccess = { 
+            space = it
+            // cachear detalle
+            kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
+        }, onFailure = { ex -> 
+            // fallback caché
+            val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
+            if (cached != null) {
+                space = cached
+                error = null
+            } else {
+                error = ex.message ?: "Error cargando espacio"
+            }
+        })
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
         repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
     }
@@ -115,7 +128,18 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         val repo = SpaceRepository()
                         val res = repo.getSpace(spaceId)
                         loading = false
-                        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+                        res.fold(onSuccess = { 
+                            space = it
+                            kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
+                        }, onFailure = { 
+                            val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
+                            if (cached != null) {
+                                space = cached
+                                error = null
+                            } else {
+                                error = it.message ?: "Error cargando espacio"
+                            }
+                        })
                     }
                 }) { Text("Reintentar") }
             }
@@ -283,8 +307,17 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     
                     // Reserve Button
                     Button(
-                        onClick = { 
-                            navController.navigate(Destinations.ReserveRoom.createRoute(s.id))
+                        onClick = {
+                            val ctx = navController.context
+                            val cm = ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                            val network = cm.activeNetwork
+                            val caps = network?.let { cm.getNetworkCapabilities(it) }
+                            val hasInternet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                            if (!hasInternet) {
+                                navController.navigate(Destinations.Offline.route)
+                            } else {
+                                navController.navigate(Destinations.ReserveRoom.createRoute(s.id))
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
