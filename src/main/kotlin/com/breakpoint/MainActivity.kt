@@ -1457,7 +1457,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     item {
                         OfflineBanner(onRetry = {
                             loading = true; error = null; offline = false
-                            loadSpaces()
+                            loadSpaces(true)
                         })
                         Spacer(Modifier.height(8.dp))
                     }
