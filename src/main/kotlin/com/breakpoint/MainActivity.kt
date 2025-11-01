@@ -117,6 +117,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -938,6 +939,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var offline by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
     var showHourPicker by remember { mutableStateOf(false) }
@@ -1103,14 +1105,35 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
             }
         }
 
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            val result = repo.getSpaces()
-            loading = false
-            result.fold(
-                onSuccess = { items = it; filtered = it },
-                onFailure = { error = it.message ?: "Error loading spaces" }
-            )
+        val ctx = LocalContext.current
+        val cache = remember(ctx) { CacheManager(ctx) }
+        fun loadSpaces() {
+            coroutineScope.launch {
+                val result = repo.getSpaces()
+                loading = false
+                result.fold(
+                    onSuccess = {
+                        offline = false
+                        items = it; filtered = it
+                        // cachear lista
+                        cache.saveSpaces(it)
+                    },
+                    onFailure = { ex ->
+                        // Intentar caché al fallar
+                        val cached = cache.loadSpaces()
+                        if (cached.isNotEmpty()) {
+                            offline = true
+                            error = null
+                            items = cached; filtered = cached
+                        } else {
+                            offline = true
+                            error = ex.message ?: "Sin conexión"
+                        }
+                    }
+                )
+            }
         }
+        androidx.compose.runtime.LaunchedEffect(Unit) { loadSpaces() }
         if (loading) {
             SimpleCenter(text = "Loading...")
         } else if (error != null) {
@@ -1120,12 +1143,8 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 Text(text = "No hay resultados")
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
-                    coroutineScope.launch {
-                        loading = true; error = null
-                        val result = repo.getSpaces()
-                        loading = false
-                        result.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
-                    }
+                    loading = true; error = null; offline = false
+                    loadSpaces()
                 }) { Text("Reintentar") }
             }
         } else if (showMap) {
@@ -1416,6 +1435,15 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
             ) {
+                if (offline) {
+                    item {
+                        OfflineBanner(onRetry = {
+                            loading = true; error = null; offline = false
+                            loadSpaces()
+                        })
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
                 item {
                     Row(
                         modifier = Modifier
@@ -1426,10 +1454,8 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         Button(onClick = {
                             coroutineScope.launch {
                                 loading = true
-                                error = null
-                                val res = repo.getSpaces()
-                                loading = false
-                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                                error = null; offline = false
+                                loadSpaces()
                             }
                         }) {
                             Text("Actualizar")
@@ -1570,6 +1596,32 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 }
             }
         )
+    }
+}
+
+@Composable
+fun OfflineBanner(onRetry: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = Color(0xFFFFEBEE)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(imageVector = Icons.Outlined.CloudOff, contentDescription = null, tint = Color(0xFFD32F2F))
+                Text(text = "Desconectado", color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
+            }
+            Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                Text("Reintentar")
+            }
+        }
     }
 }
 

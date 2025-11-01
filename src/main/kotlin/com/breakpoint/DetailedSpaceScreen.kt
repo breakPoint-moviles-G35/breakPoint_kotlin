@@ -71,7 +71,20 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
         loading = true; error = null
         val res = repo.getSpace(spaceId)
         loading = false
-        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+        res.fold(onSuccess = { 
+            space = it
+            // cachear detalle
+            kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
+        }, onFailure = { ex -> 
+            // fallback caché
+            val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
+            if (cached != null) {
+                space = cached
+                error = null
+            } else {
+                error = ex.message ?: "Error cargando espacio"
+            }
+        })
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
         repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
     }
@@ -115,7 +128,18 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         val repo = SpaceRepository()
                         val res = repo.getSpace(spaceId)
                         loading = false
-                        res.fold(onSuccess = { space = it }, onFailure = { error = it.message ?: "Error cargando espacio" })
+                        res.fold(onSuccess = { 
+                            space = it
+                            kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
+                        }, onFailure = { 
+                            val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
+                            if (cached != null) {
+                                space = cached
+                                error = null
+                            } else {
+                                error = it.message ?: "Error cargando espacio"
+                            }
+                        })
                     }
                 }) { Text("Reintentar") }
             }

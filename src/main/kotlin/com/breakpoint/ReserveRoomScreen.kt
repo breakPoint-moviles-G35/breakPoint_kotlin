@@ -91,7 +91,18 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
         spaceLoading = true; spaceError = null
         val res = repo.getSpace(spaceId)
         spaceLoading = false
-        res.fold(onSuccess = { space = it }, onFailure = { spaceError = it.message ?: "Error cargando espacio" })
+        res.fold(onSuccess = { 
+            space = it
+            kotlin.runCatching { CacheManager(ctx).saveDetail(it) }
+        }, onFailure = { ex -> 
+            val cached = kotlin.runCatching { CacheManager(ctx).loadDetail(spaceId) }.getOrNull()
+            if (cached != null) {
+                space = cached
+                spaceError = null
+            } else {
+                spaceError = ex.message ?: "Error cargando espacio"
+            }
+        })
     }
     
     Scaffold(
