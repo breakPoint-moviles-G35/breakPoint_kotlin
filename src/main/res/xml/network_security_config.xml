@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">192.168.1.121</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
+    <!-- Permitir HTTP (cleartext) a cualquier host en debug para que la URL que configuras en la app funcione sin tocar este archivo. -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>
 
 

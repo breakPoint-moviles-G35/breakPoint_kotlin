@@ -3,6 +3,9 @@ package com.breakpoint
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.Request
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -214,8 +217,8 @@ class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Inter
 }
 
 object ApiProvider {
-    // TODO: adjust baseUrl to your running backend
-    private const val baseUrl = BuildConfig.BACKEND_BASE_URL // Android emulator to localhost
+    // URL por defecto (puede ser cambiada en runtime desde la app)
+    @Volatile private var baseUrl: String = "http://192.168.68.121:3000/"
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null
@@ -252,16 +255,51 @@ object ApiProvider {
             .build()
     }
 
-    private val retrofit: Retrofit by lazy {
-        Retrofit.Builder()
+    @Volatile private var retrofit: Retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    @Volatile var auth: AuthApi = retrofit.create(AuthApi::class.java)
+        private set
+    @Volatile var space: SpaceApi = retrofit.create(SpaceApi::class.java)
+        private set
+    @Volatile var booking: BookingApi = retrofit.create(BookingApi::class.java)
+        private set
+    @Volatile var review: ReviewApi = retrofit.create(ReviewApi::class.java)
+        private set
+
+    @Synchronized
+    fun updateBaseUrl(url: String) {
+        if (url.isBlank() || url == baseUrl) return
+        baseUrl = if (url.endsWith('/')) url else "$url/"
+        retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+        auth = retrofit.create(AuthApi::class.java)
+        space = retrofit.create(SpaceApi::class.java)
+        booking = retrofit.create(BookingApi::class.java)
+        review = retrofit.create(ReviewApi::class.java)
     }
 
-    val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
-    val space: SpaceApi by lazy { retrofit.create(SpaceApi::class.java) }
-    val booking: BookingApi by lazy { retrofit.create(BookingApi::class.java) }
-    val review: ReviewApi by lazy { retrofit.create(ReviewApi::class.java) }
+    fun currentBaseUrl(): String = baseUrl
+
+    suspend fun testConnectivity(url: String): Boolean = withContext(Dispatchers.IO) {
+        val base = if (url.endsWith('/')) url else "$url/"
+        val testUrl = base + "space"
+        return@withContext try {
+            val testClient = OkHttpClient.Builder()
+                .connectTimeout(java.time.Duration.ofSeconds(3))
+                .readTimeout(java.time.Duration.ofSeconds(3))
+                .build()
+            val req = Request.Builder().url(testUrl).get().build()
+            val resp = testClient.newCall(req).execute()
+            resp.use { true }
+        } catch (_: Throwable) {
+            false
+        }
+    }
 }
