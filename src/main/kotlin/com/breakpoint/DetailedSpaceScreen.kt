@@ -307,8 +307,17 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                     
                     // Reserve Button
                     Button(
-                        onClick = { 
-                            navController.navigate(Destinations.ReserveRoom.createRoute(s.id))
+                        onClick = {
+                            val ctx = navController.context
+                            val cm = ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                            val network = cm.activeNetwork
+                            val caps = network?.let { cm.getNetworkCapabilities(it) }
+                            val hasInternet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                            if (!hasInternet) {
+                                navController.navigate(Destinations.Offline.route)
+                            } else {
+                                navController.navigate(Destinations.ReserveRoom.createRoute(s.id))
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()

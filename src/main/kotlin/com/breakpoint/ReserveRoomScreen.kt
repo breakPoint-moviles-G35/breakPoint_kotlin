@@ -306,6 +306,10 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = {
+                        if (!isOnline(ctx)) {
+                            navController.navigate(Destinations.Offline.route)
+                            return@Button
+                        }
                         error = null
                         loading = true
                         if (selectedDate.isBlank()) {

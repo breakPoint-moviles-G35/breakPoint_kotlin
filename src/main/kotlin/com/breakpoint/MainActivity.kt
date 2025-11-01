@@ -117,6 +117,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.CoroutineScope
@@ -392,6 +394,7 @@ fun BreakPointApp() {
                 val bookingId = backStackEntry.arguments?.getString("bookingId")
                 ReserveRoomScreen(spaceId = spaceId, navController = navController, bookingId = bookingId)
             }
+            composable(Destinations.Offline.route) { NoInternetScreen(navController) }
         }
     }
 }
@@ -414,6 +417,7 @@ sealed class Destinations(val route: String, val label: String) {
             return if (bookingId.isNullOrBlank()) "reserve_room/$spaceId" else "reserve_room/$spaceId?bookingId=$bookingId"
         }
     }
+    data object Offline : Destinations("offline", "Offline")
 }
 
 @Composable
@@ -453,6 +457,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.Map -> Icons.Outlined.Map
                         Destinations.Reservations -> Icons.Outlined.CalendarMonth
                         Destinations.Review -> Icons.Default.Star
+                        Destinations.Offline -> Icons.Outlined.CloudOff
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
@@ -1291,6 +1296,10 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     onClick = {
                         if (nearestLoading) return@Surface
                         coroutineScope.launch {
+                            if (!isOnline(context)) {
+                                navController.navigate(Destinations.Offline.route)
+                                return@launch
+                            }
                             val pmFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
                             val pmCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
                             if (pmFine != PackageManager.PERMISSION_GRANTED && pmCoarse != PackageManager.PERMISSION_GRANTED) {
@@ -1786,6 +1795,42 @@ private fun SimpleCenter(text: String) {
     ) { Text(text = text, fontSize = 20.sp, fontWeight = FontWeight.Medium) }
 }
 
+fun isOnline(ctx: android.content.Context): Boolean {
+    val cm = ctx.getSystemService(ConnectivityManager::class.java)
+    val network = cm.activeNetwork
+    val caps = network?.let { cm.getNetworkCapabilities(it) }
+    return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+}
+
+@Composable
+fun NoInternetScreen(navController: NavHostController) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(imageVector = Icons.Outlined.CloudOff, contentDescription = null, tint = Color(0xFFD32F2F), modifier = Modifier.size(64.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(text = "Sin conexión a internet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(text = "Conéctate para continuar con la reserva.", color = Color.Gray)
+        Spacer(modifier = Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { navController.popBackStack() }) { Text("Volver") }
+            val ctx = LocalContext.current
+            Button(onClick = {
+                val cm = ctx.getSystemService(ConnectivityManager::class.java)
+                val network = cm.activeNetwork
+                val caps = network?.let { cm.getNetworkCapabilities(it) }
+                val online = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+                if (online) navController.popBackStack()
+            }) { Text("Reintentar") }
+        }
+    }
+}
+
 @Composable
 private fun RateScreen() {
     SimpleCenter(text = "Rate")
@@ -1799,15 +1844,38 @@ fun ReservationsScreen(navController: NavHostController) {
     var filtered by remember { mutableStateOf<List<BookingListItemDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var offline by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val cache = remember(ctx) { CacheManager(ctx) }
+    val scope = rememberCoroutineScope()
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        val result = repo.listMyBookings()
-        loading = false
-        result.fold(
-            onSuccess = { list -> items = list; filtered = list },
-            onFailure = { t -> error = t.message ?: "Error cargando reservas" }
-        )
+    fun reload() {
+        scope.launch {
+            loading = true; error = null; offline = false
+            val result = repo.listMyBookings()
+            loading = false
+            result.fold(
+                onSuccess = { list ->
+                    offline = false
+                    items = list; filtered = list
+                    kotlin.runCatching { cache.saveBookings(list) }
+                },
+                onFailure = { t ->
+                    val cached = kotlin.runCatching { cache.loadBookings() }.getOrNull().orEmpty()
+                    val hasCache = kotlin.runCatching { cache.hasBookingsCache() }.getOrNull() == true
+                    if (hasCache) {
+                        offline = true
+                        error = null
+                        items = cached; filtered = cached
+                    } else {
+                        error = t.message ?: "Error cargando reservas"
+                    }
+                }
+            )
+        }
     }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { reload() }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -1866,6 +1934,12 @@ fun ReservationsScreen(navController: NavHostController) {
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
             ) {
+                if (offline) {
+                    item {
+                        OfflineBanner(onRetry = { reload() })
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
                 items(filtered) { booking ->
                     BookingCard(
                         booking = booking,
@@ -2022,6 +2096,7 @@ fun ProfileScreen(navController: NavHostController) {
     var role by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val result = repo.profile()
@@ -2032,7 +2107,15 @@ fun ProfileScreen(navController: NavHostController) {
                 name = it.name ?: ""
                 role = it.role ?: ""
             },
-            onFailure = { error = it.message ?: "Error cargando perfil" }
+            onFailure = {
+                val offline = !isOnline(ctx)
+                if (offline) {
+                    // Navegar a pantalla sin conexión
+                    navController.navigate(Destinations.Offline.route)
+                } else {
+                    error = it.message ?: "Error cargando perfil"
+                }
+            }
         )
     }
 
