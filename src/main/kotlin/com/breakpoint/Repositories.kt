@@ -154,6 +154,15 @@ class SpaceRepository {
         }
     }
 
+    suspend fun getRecommendations(userId: String): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.recommendations(userId).map { it.toSpaceItem() }
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val listDto = ApiProvider.space.getSpaces()

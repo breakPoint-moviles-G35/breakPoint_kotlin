@@ -136,6 +136,9 @@ interface SpaceApi {
         @Query("longitude") lng: Double,
         @Query("limit") limit: Int = 5
     ): List<SpaceDto>
+
+    @GET("space/recommendations/{userId}")
+    suspend fun recommendations(@Path("userId") userId: String): List<SpaceDto>
 }
 
 interface BookingApi {
@@ -212,7 +215,7 @@ class AuthorizationInterceptor(private val tokenProvider: () -> String?) : Inter
 
 object ApiProvider {
     // TODO: adjust baseUrl to your running backend
-    private const val baseUrl = BuildConfig.BACKEND_BASE_URL  // Android emulator to localhost
+    private const val baseUrl = "http://192.168.68.116:3000/"  // Android emulator to localhost
 
     @Volatile private var authToken: String? = null
     @Volatile private var onUnauthorized: (() -> Unit)? = null

@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -109,6 +110,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -925,8 +928,10 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val repo = remember { SpaceRepository() }
+    val authRepo = remember { AuthRepository() }
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    var recommendations by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -1095,12 +1100,23 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
         }
 
         androidx.compose.runtime.LaunchedEffect(Unit) {
-            val result = repo.getSpacesSortedByPriceCached()
-            loading = false
-            result.fold(
-                onSuccess = { items = it; filtered = it },
-                onFailure = { error = it.message ?: "Error loading spaces" }
-            )
+            loading = true
+            coroutineScope {
+                val spacesDef = async { repo.getSpacesSortedByPriceCached() }
+                val profileDef = async { authRepo.profile() }
+                val spacesRes = spacesDef.await()
+                val profileRes = profileDef.await()
+                loading = false
+                spacesRes.fold(
+                    onSuccess = { items = it; filtered = it },
+                    onFailure = { error = it.message ?: "Error loading spaces" }
+                )
+                profileRes.onSuccess { user ->
+                    // cargar recomendaciones personalizadas
+                    val recs = repo.getRecommendations(user.id)
+                    recs.onSuccess { list -> recommendations = list.take(10) }
+                }
+            }
         }
         if (loading) {
             SimpleCenter(text = "Loading...")
@@ -1418,9 +1434,18 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                             coroutineScope.launch {
                                 loading = true
                                 error = null
-                                val res = repo.getSpacesSortedByPriceCached(true)
-                                loading = false
-                                res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                                coroutineScope {
+                                    val spacesDef = async { repo.getSpacesSortedByPriceCached(true) }
+                                    val profileDef = async { authRepo.profile() }
+                                    val res = spacesDef.await()
+                                    val profileRes = profileDef.await()
+                                    loading = false
+                                    res.fold(onSuccess = { items = it; filtered = it }, onFailure = { error = it.message })
+                                    profileRes.onSuccess { user ->
+                                        val recs = repo.getRecommendations(user.id)
+                                        recs.onSuccess { list -> recommendations = list.take(10) }
+                                    }
+                                }
                             }
                         }) {
                             Text("Actualizar")
@@ -1468,6 +1493,20 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    if (recommendations.isNotEmpty()) {
+                        Text(text = "Recomendados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.foundation.lazy.LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(recommendations) { rec ->
+                                RecommendationChip(space = rec) {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(rec.id))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
                 items(filtered) { space ->
                     SpaceCard(space = space, onClick = {
@@ -1727,6 +1766,39 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
         Spacer(modifier = Modifier.height(8.dp))
         val priceLabel = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP"
         Text(text = priceLabel, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun RecommendationChip(space: SpaceItem, onClick: () -> Unit = {}) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = 2.dp,
+        shadowElevation = 4.dp,
+        color = Color.White,
+        modifier = Modifier
+            .defaultMinSize(minHeight = 40.dp)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = space.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 160.dp)
+            )
+            Text(
+                text = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
