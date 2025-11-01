@@ -1,5 +1,6 @@
 package com.breakpoint
 
+import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -44,6 +45,24 @@ class AuthRepository {
 }
 
 class SpaceRepository {
+    companion object {
+        // Process-wide in-memory cache for spaces (persists across repository instances)
+        private data class Cached<T>(val data: T, val timestampMs: Long)
+        private val spacesCache = LruCache<String, Cached<List<SpaceDto>>>(2)
+        private const val CACHE_TTL_MS: Long = 5 * 60 * 1000 // 5 minutes
+
+        private fun isFresh(c: Cached<*>?): Boolean =
+            c != null && (System.currentTimeMillis() - c.timestampMs) < CACHE_TTL_MS
+
+        private fun putSpacesCache(key: String, data: List<SpaceDto>) {
+            spacesCache.put(key, Cached(data, System.currentTimeMillis()))
+        }
+
+        fun invalidateSpacesCache() {
+            spacesCache.evictAll()
+        }
+    }
+
     private fun SpaceDto.toSpaceItem(): SpaceItem {
         val hourlyPrice = try {
             // Backend expone 'price' como decimal (string). Es precio por hora.
@@ -135,9 +154,20 @@ class SpaceRepository {
         }
     }
 
+    suspend fun getRecommendations(userId: String): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val list = ApiProvider.space.recommendations(userId).map { it.toSpaceItem() }
+            Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
     suspend fun getSpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
         return@withContext try {
-            val list = ApiProvider.space.getSpaces().map { it.toSpaceItem() }
+            val listDto = ApiProvider.space.getSpaces()
+            putSpacesCache("spaces_all_v1", listDto)
+            val list = listDto.map { it.toSpaceItem() }
             Result.success(list)
         } catch (t: Throwable) {
             Result.failure(t)
@@ -148,6 +178,27 @@ class SpaceRepository {
         return@withContext try {
             val list = ApiProvider.space.getSpacesSorted().map { it.toSpaceItem() }
             Result.success(list)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    // Cached sort-by-price: uses cached spaces if fresh, otherwise fetches and caches
+    suspend fun getSpacesSortedByPriceCached(forceRefresh: Boolean = false): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val key = "spaces_all_v1"
+            val cached = spacesCache.get(key)
+            val source = if (!forceRefresh && isFresh(cached)) {
+                cached!!.data
+            } else {
+                val fresh = ApiProvider.space.getSpaces()
+                putSpacesCache(key, fresh)
+                fresh
+            }
+            val sorted = source.sortedBy { dto ->
+                try { (dto.price ?: "0").toDouble() } catch (_: Throwable) { Double.MAX_VALUE }
+            }.map { it.toSpaceItem() }
+            Result.success(sorted)
         } catch (t: Throwable) {
             Result.failure(t)
         }

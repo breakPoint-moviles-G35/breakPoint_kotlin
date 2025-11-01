@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -109,6 +110,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -940,8 +943,10 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val repo = remember { SpaceRepository() }
+    val authRepo = remember { AuthRepository() }
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    var recommendations by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var offline by remember { mutableStateOf(false) }
@@ -1109,36 +1114,43 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 }
             }
         }
-
-        val ctx = LocalContext.current
-        val cache = remember(ctx) { CacheManager(ctx) }
-        fun loadSpaces() {
+        val cache = remember(context) { CacheManager(context) }
+        fun loadSpaces(forceRefresh: Boolean) {
             coroutineScope.launch {
-                val result = repo.getSpaces()
-                loading = false
-                result.fold(
-                    onSuccess = {
-                        offline = false
-                        items = it; filtered = it
-                        // cachear lista
-                        cache.saveSpaces(it)
-                    },
-                    onFailure = { ex ->
-                        // Intentar caché al fallar
-                        val cached = cache.loadSpaces()
-                        if (cached.isNotEmpty()) {
-                            offline = true
-                            error = null
-                            items = cached; filtered = cached
-                        } else {
-                            offline = true
-                            error = ex.message ?: "Sin conexión"
+                loading = true
+                error = null
+                coroutineScope {
+                    val spacesDef = async { repo.getSpacesSortedByPriceCached(forceRefresh) }
+                    val profileDef = async { authRepo.profile() }
+                    val spacesRes = spacesDef.await()
+                    val profileRes = profileDef.await()
+                    loading = false
+                    spacesRes.fold(
+                        onSuccess = {
+                            offline = false
+                            items = it; filtered = it
+                            cache.saveSpaces(it)
+                        },
+                        onFailure = { ex ->
+                            val cached = cache.loadSpaces()
+                            if (cached.isNotEmpty()) {
+                                offline = true
+                                error = null
+                                items = cached; filtered = cached
+                            } else {
+                                offline = true
+                                error = ex.message ?: "Sin conexión"
+                            }
                         }
+                    )
+                    profileRes.onSuccess { user ->
+                        val recs = repo.getRecommendations(user.id)
+                        recs.onSuccess { list -> recommendations = list.take(10) }
                     }
-                )
+                }
             }
         }
-        androidx.compose.runtime.LaunchedEffect(Unit) { loadSpaces() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { loadSpaces(false) }
         if (loading) {
             SimpleCenter(text = "Loading...")
         } else if (error != null) {
@@ -1147,10 +1159,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
             Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Text(text = "No hay resultados")
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = {
-                    loading = true; error = null; offline = false
-                    loadSpaces()
-                }) { Text("Reintentar") }
+                Button(onClick = { loadSpaces(false) }) { Text("Reintentar") }
             }
         } else if (showMap) {
             val firstLatLng = filtered.firstOrNull()?.let { spaceToLatLng(it) }
@@ -1460,14 +1469,31 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                             .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(onClick = {
-                            coroutineScope.launch {
-                                loading = true
-                                error = null; offline = false
-                                loadSpaces()
-                            }
-                        }) {
+                        Button(onClick = { loadSpaces(true) }) {
                             Text("Actualizar")
+                        }
+                        var showPriceMenu by remember { mutableStateOf(false) }
+                        Box {
+                            Button(onClick = { showPriceMenu = true }) { Text("Precio") }
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showPriceMenu,
+                                onDismissRequest = { showPriceMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Menor a mayor") },
+                                    onClick = {
+                                        showPriceMenu = false
+                                        filtered = items.sortedBy { it.price }
+                                    }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text("Mayor a menor") },
+                                    onClick = {
+                                        showPriceMenu = false
+                                        filtered = items.sortedByDescending { it.price }
+                                    }
+                                )
+                            }
                         }
                         Button(
                             onClick = { openMap() },
@@ -1489,6 +1515,20 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    if (recommendations.isNotEmpty()) {
+                        Text(text = "Recomendados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        androidx.compose.foundation.lazy.LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(recommendations) { rec ->
+                                RecommendationChip(space = rec) {
+                                    navController.navigate(Destinations.DetailedSpace.createRoute(rec.id))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
                 items(filtered) { space ->
                     SpaceCard(space = space, onClick = {
@@ -1770,14 +1810,43 @@ fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
         if (!space.subtitle.isNullOrBlank()) {
             Text(space.subtitle, color = Color.Gray)
         }
-        Text(space.address, color = Color.Gray)
-        Text(space.hour, color = Color.Gray)
+        // Ocultar latitud/longitud y hora en la tarjeta principal
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "$$$$",
-            fontWeight = FontWeight.SemiBold,
-            textDecoration = TextDecoration.Underline
-        )
+        val priceLabel = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP"
+        Text(text = priceLabel, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun RecommendationChip(space: SpaceItem, onClick: () -> Unit = {}) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = 2.dp,
+        shadowElevation = 4.dp,
+        color = Color.White,
+        modifier = Modifier
+            .defaultMinSize(minHeight = 40.dp)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = space.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 160.dp)
+            )
+            Text(
+                text = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
