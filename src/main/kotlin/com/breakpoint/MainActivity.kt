@@ -120,6 +120,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
+import com.breakpoint.ApiProvider
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.compose.material.icons.outlined.CloudOff
@@ -315,10 +316,18 @@ fun BreakPointApp() {
         // Autologin: si hay token en DataStore, úsalo
         val context = LocalContext.current
         val tokenManager = remember { TokenManager(context) }
+        val serverCfg = remember { ServerConfigManager(context) }
         androidx.compose.runtime.LaunchedEffect(Unit) {
             tokenManager.tokenFlow.collect { token ->
                 if (!token.isNullOrBlank()) {
                     ApiProvider.setToken(token)
+                }
+            }
+        }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            serverCfg.urlFlow.collect { url ->
+                if (!url.isNullOrBlank()) {
+                    setServerBaseUrl(url)
                 }
             }
         }
@@ -376,6 +385,9 @@ fun BreakPointApp() {
                             popUpTo(Destinations.Login.route) { inclusive = true }
                             launchSingleTop = true
                         }
+                    },
+                    onOpenServerSettings = {
+                        navController.navigate(Destinations.ServerSettings.route)
                     }
                 )
             }
@@ -384,6 +396,7 @@ fun BreakPointApp() {
             
             composable(Destinations.Reservations.route) { ReservationsScreen(navController) }
             composable(Destinations.Profile.route) { ProfileScreen(navController) }
+            composable(Destinations.ServerSettings.route) { ServerSettingsScreen(navController) }
             composable(Destinations.Review.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 ReviewScreen(spaceId = spaceId, navController = navController)
@@ -421,6 +434,7 @@ sealed class Destinations(val route: String, val label: String) {
         }
     }
     data object Offline : Destinations("offline", "Offline")
+    data object ServerSettings : Destinations("settings/server", "Server")
 }
 
 @Composable
@@ -461,6 +475,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.Reservations -> Icons.Outlined.CalendarMonth
                         Destinations.Review -> Icons.Default.Star
                         Destinations.Offline -> Icons.Outlined.CloudOff
+                        Destinations.ServerSettings -> Icons.Default.Tune
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
@@ -476,7 +491,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {}) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isRegister by remember { mutableStateOf(false) }
@@ -559,6 +574,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             .verticalScroll(scrollState)
             .imePadding()
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onOpenServerSettings) {
+                Icon(Icons.Default.Tune, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Configurar servidor")
+            }
+        }
         Spacer(modifier = Modifier.height(12.dp))
         // Toggle Login/Register
         Row(
@@ -1901,6 +1928,72 @@ fun NoInternetScreen(navController: NavHostController) {
 }
 
 @Composable
+fun ServerSettingsScreen(navController: NavHostController) {
+    val ctx = LocalContext.current
+    val serverCfg = remember { ServerConfigManager(ctx) }
+    var url by remember { mutableStateOf("") }
+    var testing by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        url = getServerBaseUrl()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(text = "Servidor (IP local)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(text = "Este backend es local. Debes estar en la misma red que el PC que corre el backend y escribir su IP LAN, por ejemplo: http://192.168.x.x:3000. En emulador usa http://10.0.2.2:3000.", color = Color.Gray)
+        TextField(
+            value = url,
+            onValueChange = { v: String -> url = v },
+            singleLine = true,
+            placeholder = { Text("http://192.168.X.X:3000") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            )
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = {
+                // Probar conexión simple
+                testing = true; message = null
+                scope.launch {
+                    try {
+                        // Validación básica de esquema
+                        val valid = url.startsWith("http://") || url.startsWith("https://")
+                        if (!valid) throw IllegalArgumentException("URL inválida")
+                        // Intento real contra el backend: GET /space (código cualquiera indica alcanzable)
+                        if (!isOnline(ctx)) throw IllegalStateException("Sin conexión a internet")
+                        val ok = pingServerUrl(url)
+                        message = if (ok) "Servidor alcanzable" else "No se pudo contactar el servidor"
+                    } catch (t: Throwable) {
+                        message = t.message ?: "No se pudo probar"
+                    } finally {
+                        testing = false
+                    }
+                }
+            }) { Text(if (testing) "Probando…" else "Probar conexión") }
+            Button(onClick = {
+                scope.launch {
+                    setServerBaseUrl(url)
+                    serverCfg.saveUrl(url)
+                    message = "Servidor guardado"
+                }
+            }) { Text("Guardar") }
+        }
+        message?.let { Text(it, color = Color.Gray) }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = { navController.popBackStack() }) { Text("Volver") }
+    }
+}
+
+@Composable
 private fun RateScreen() {
     SimpleCenter(text = "Rate")
 }
@@ -2240,6 +2333,10 @@ fun ProfileScreen(navController: NavHostController) {
                         }
                     }) {
                         Text("Cerrar sesión")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { navController.navigate(Destinations.ServerSettings.route) }) {
+                        Text("Configurar servidor (IP local)")
                     }
                 }
             }
