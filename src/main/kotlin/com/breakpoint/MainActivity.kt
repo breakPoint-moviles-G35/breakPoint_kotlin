@@ -1315,7 +1315,15 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     profileRes.onSuccess { user ->
                         profileId = user.id
                         val recs = repo.getRecommendations(user.id)
-                        recs.onSuccess { list -> recommendations = list.take(10) }
+                        recs.onSuccess { list ->
+                            recommendations = if (list.isNotEmpty()) list.take(10) else filtered.take(10)
+                        }.onFailure {
+                            // Fallback: usa los primeros espacios ya cargados
+                            recommendations = filtered.take(10)
+                        }
+                    }.onFailure {
+                        // Si no se pudo obtener el perfil, al menos muestra sugeridos por defecto
+                        recommendations = filtered.take(10)
                     }
                 }
             }
