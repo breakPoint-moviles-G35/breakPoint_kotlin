@@ -271,6 +271,50 @@ class SpaceRepository {
             Result.failure(t)
         }
     }
+
+    suspend fun getWeekdayHistogram(spaceId: String): Result<List<Int>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            // Orden Lunes..Domingo
+            val counts = IntArray(7)
+            fun parseDate(text: String): java.util.Date? {
+                val patterns = listOf(
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                    "yyyy-MM-dd'T'HH:mm:ssX",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'"
+                )
+                for (p in patterns) {
+                    try {
+                        val sdf = java.text.SimpleDateFormat(p, java.util.Locale.US)
+                        return sdf.parse(text)
+                    } catch (_: Throwable) {}
+                }
+                return null
+            }
+            detail.bookings.orEmpty().forEach { b ->
+                try {
+                    val start = parseDate(b.slot_start) ?: return@forEach
+                    val cal = java.util.Calendar.getInstance().apply { time = start }
+                    // Calendar: Domingo=1...Sábado=7
+                    val dow = cal.get(java.util.Calendar.DAY_OF_WEEK) // 1..7
+                    val index = when (dow) {
+                        java.util.Calendar.MONDAY -> 0
+                        java.util.Calendar.TUESDAY -> 1
+                        java.util.Calendar.WEDNESDAY -> 2
+                        java.util.Calendar.THURSDAY -> 3
+                        java.util.Calendar.FRIDAY -> 4
+                        java.util.Calendar.SATURDAY -> 5
+                        else -> 6 // Domingo
+                    }
+                    counts[index] = counts[index] + 1
+                } catch (_: Throwable) {}
+            }
+            Result.success(counts.toList())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
 }
 
 class HostRepository {

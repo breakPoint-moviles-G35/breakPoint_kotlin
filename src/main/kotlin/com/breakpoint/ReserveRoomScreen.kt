@@ -94,6 +94,9 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     var suggestionTimeLabel by remember { mutableStateOf<String?>(null) } // p.ej. "1:30 PM" o "2:00 PM"
     var suggestionDateIso by remember { mutableStateOf<String?>(null) }   // yyyy-MM-dd
     var transportMode by remember { mutableStateOf("walk") } // "walk" | "drive" (futuro toggle)
+    // Telemetría: días más reservados
+    var weekdayHistogram by remember { mutableStateOf<List<Int>?>(null) }
+    var weekdayError by remember { mutableStateOf<String?>(null) }
     val repo = remember { BookingRepository() }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
@@ -120,7 +123,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reserve Room") },
+                title = { Text("Reservar espacio") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
@@ -144,6 +147,17 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             return@Scaffold
         }
         val totalPrice = s.price * duration
+
+        // Cargar histograma de días más reservados del espacio
+        LaunchedEffect(s.id) {
+            weekdayError = null; weekdayHistogram = null
+            val spaceRepo = SpaceRepository()
+            val res = spaceRepo.getWeekdayHistogram(s.id)
+            res.fold(
+                onSuccess = { weekdayHistogram = it },
+                onFailure = { weekdayError = it.message ?: "No fue posible cargar la telemetría" }
+            )
+        }
 
         // Cálculo ETA y sugerencia de primer horario alcanzable (best-effort)
         LaunchedEffect(s.fullAddress, transportMode) {
@@ -239,7 +253,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Select Date",
+                    text = "Selecciona la fecha",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -254,7 +268,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Select Time",
+                    text = "Selecciona la hora",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -274,7 +288,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Llegar a tiempo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Sugerencia para llegar a tiempo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(6.dp))
                         when {
                             etaError != null -> {
@@ -311,12 +325,81 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     }
                 }
             }
+
+            // Días más reservados (semana)
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Días con más reservas esta semana", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        when {
+                            weekdayError != null -> Text(weekdayError ?: "", color = Color(0xFF6B7280))
+                            weekdayHistogram == null -> Text("Cargando...", color = Color(0xFF6B7280))
+                            else -> {
+                                val counts = weekdayHistogram ?: List(7) { 0 }
+                                val labels = listOf("L", "M", "X", "J", "V", "S", "D")
+                                val maxVal = (counts.maxOrNull() ?: 1).coerceAtLeast(1)
+                                // Chips Top 3
+                                val top = counts.mapIndexed { idx, v -> idx to v }
+                                    .sortedByDescending { it.second }
+                                    .take(3).filter { it.second > 0 }
+                                if (top.isNotEmpty()) {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items(top) { (idx, v) ->
+                                            TimeChip(time = "${labels[idx]}: x$v", isSelected = false, onClick = {})
+                                        }
+                                    }
+                                    Spacer(Modifier.height(10.dp))
+                                }
+                                // Barras simples
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(96.dp)
+                                        .padding(bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.Bottom
+                                ) {
+                                    counts.forEachIndexed { i, value ->
+                                        val h = if (maxVal == 0) 0f else (value.toFloat() / maxVal.toFloat())
+                                        val barHeight = max(6f, h * 64f) // altura mínima y tope visual
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(12.dp)
+                                                    .height(barHeight.dp)
+                                                    .background(
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                                        RoundedCornerShape(6.dp)
+                                                    )
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                            Text(labels[i], style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280))
+                                        }
+                                    }
+                                }
+                                // Nota visual
+                                Spacer(Modifier.height(6.dp))
+                                Text("Escala basada en el día con más reservas", style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
+                            }
+                        }
+                    }
+                }
+            }
             
             // Duration Selection
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Duration",
+                    text = "Duración",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -331,7 +414,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Number of Guests",
+                    text = "Número de personas",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -359,7 +442,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Price per hour",
+                                text = "Precio por hora",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
@@ -378,7 +461,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "${duration} hour${if (duration > 1) "s" else ""}",
+                                text = "${duration} hora${if (duration > 1) "s" else ""}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
@@ -495,7 +578,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     enabled = selectedDate.isNotEmpty() && selectedTime.isNotEmpty() && !loading
                 ) {
                     Text(
-                        text = if (loading) "Reservando..." else "Reserve for $${totalPrice}",
+                        text = if (loading) "Reservando..." else "Reservar por $${totalPrice}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
