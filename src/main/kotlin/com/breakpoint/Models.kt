@@ -50,3 +50,40 @@ data class ReservationData(
     val totalPrice: Int,
     val guestCount: Int
 )
+
+
+fun SpaceItem.asSpaceDto(): SpaceDto {
+    val priceText = if (price > 0) price.toString() else null
+    return SpaceDto(
+        id = id,
+        title = title,
+        imageUrl = imageUrl,
+        subtitle = subtitle,
+        geo = geo ?: address,
+        capacity = 0,
+        amenities = null,
+        accessibility = null,
+        rules = null,
+        price = priceText,
+        rating_avg = rating
+    )
+}
+
+fun SpaceDto.toSpaceItem(): SpaceItem {
+    val priceInt = try {
+        price?.toDouble()?.toInt() ?: 0
+    } catch (_: Throwable) {
+        0
+    }
+    return SpaceItem(
+        id = id,
+        title = title,
+        imageUrl = imageUrl,
+        address = geo.orEmpty(),
+        hour = subtitle.orEmpty(),
+        rating = rating_avg ?: 0.0,
+        price = priceInt,
+        subtitle = subtitle,
+        geo = geo
+    )
+}

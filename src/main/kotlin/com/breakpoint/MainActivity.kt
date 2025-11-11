@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
@@ -974,6 +975,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var recommendations by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    var profileId by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var offline by remember { mutableStateOf(false) }
@@ -1171,6 +1173,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         }
                     )
                     profileRes.onSuccess { user ->
+                        profileId = user.id
                         val recs = repo.getRecommendations(user.id)
                         recs.onSuccess { list -> recommendations = list.take(10) }
                     }
@@ -1490,6 +1493,13 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     }
                 }
                 item {
+                    profileId?.takeIf { it.isNotBlank() }?.let { id ->
+                        RecommendationsBlock(
+                            navController = navController,
+                            userId = id
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1558,9 +1568,17 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     }
                 }
                 items(filtered) { space ->
-                    SpaceCard(space = space, onClick = {
-                        navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
-                    })
+                    SpaceCard(
+                        space = space.asSpaceDto(),
+                        onClick = {
+                            navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        showLocation = false,
+                        showPrice = true,
+                        showDetailsButton = true,
+                        compact = false
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
@@ -1786,62 +1804,163 @@ private fun HourDropdown(label: String, hour: Int?, onHourSelected: (Int) -> Uni
 }
 
 @Composable
-fun SpaceCard(space: SpaceItem,  onClick: () -> Unit = {}) {
+fun SpaceCard(
+    space: SpaceItem,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    onClick: () -> Unit = {},
+    showLocation: Boolean = true,
+    showPrice: Boolean = true,
+    showDetailsButton: Boolean = false,
+    compact: Boolean = false
+) {
+    val accentColor = Color(0xFF5C1B6C)
+    val imageHeight = if (compact) 160.dp else 220.dp
+    val contentPadding = if (compact) 12.dp else 16.dp
+    val verticalSpacing = if (compact) 8.dp else 12.dp
+    val priceLabel = remember(space.price) {
+        if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP"
+    }
+    val ratingText = remember(space.rating) {
+        if (space.rating > 0) String.format(Locale.getDefault(), "%.1f", space.rating) else null
+    }
+    val locationText = remember(space.subtitle, space.address) {
+        space.subtitle?.takeIf { it.isNotBlank() } ?: space.address.takeIf { it.isNotBlank() }
+    }
+
     Card(
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+        modifier = modifier.clickable { onClick() },
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (compact) 2.dp else 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        if (!space.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = space.imageUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(Color(0xFFE0E0E0))
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                space.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, contentDescription = null)
-                Text(
-                    text = String.format(Locale.getDefault(), "%.2f", space.rating),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 8.dp)
+        Column {
+            if (!space.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = space.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(imageHeight)
+                        .clip(MaterialTheme.shapes.large),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(imageHeight)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(Color(0xFFE0E0E0))
                 )
             }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = contentPadding, vertical = contentPadding)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = space.title,
+                        style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    ratingText?.let {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = it,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accentColor,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                space.subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(modifier = Modifier.height(verticalSpacing))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (showLocation) {
+                    locationText?.let {
+                        Spacer(modifier = Modifier.height(verticalSpacing))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (showPrice) {
+                    Spacer(modifier = Modifier.height(verticalSpacing))
+                    Text(
+                        text = priceLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                }
+
+                if (showDetailsButton) {
+                    Spacer(modifier = Modifier.height(verticalSpacing))
+                    Button(
+                        onClick = onClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor = Color.White
+                        ),
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        Text(text = "Ver detalles", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        if (!space.subtitle.isNullOrBlank()) {
-            Text(space.subtitle, color = Color.Gray)
-        }
-        // Ocultar latitud/longitud y hora en la tarjeta principal
-        Spacer(modifier = Modifier.height(8.dp))
-        val priceLabel = if (space.price <= 0) "Gratis" else "${formatPriceLabel(space.price)} COP"
-        Text(text = priceLabel, fontWeight = FontWeight.SemiBold)
     }
+}
+
+@Composable
+fun SpaceCard(
+    space: SpaceDto,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    onClick: () -> Unit = {},
+    showLocation: Boolean = true,
+    showPrice: Boolean = true,
+    showDetailsButton: Boolean = false,
+    compact: Boolean = false
+) {
+    SpaceCard(
+        space = space.toSpaceItem(),
+        modifier = modifier,
+        onClick = onClick,
+        showLocation = showLocation,
+        showPrice = showPrice,
+        showDetailsButton = showDetailsButton,
+        compact = compact
+    )
 }
 
 @Composable
