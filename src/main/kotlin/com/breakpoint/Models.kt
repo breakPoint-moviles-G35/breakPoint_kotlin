@@ -75,6 +75,7 @@ fun SpaceDto.toSpaceItem(): SpaceItem {
     } catch (_: Throwable) {
         0
     }
+    val latLng = parseLatLngFromGeo(geo)
     return SpaceItem(
         id = id,
         title = title,
@@ -84,6 +85,25 @@ fun SpaceDto.toSpaceItem(): SpaceItem {
         rating = rating_avg ?: 0.0,
         price = priceInt,
         subtitle = subtitle,
-        geo = geo
+        geo = geo,
+        latitude = latLng?.first,
+        longitude = latLng?.second
     )
+}
+
+private fun parseLatLngFromGeo(raw: String?): Pair<Double, Double>? {
+    if (raw.isNullOrBlank()) return null
+    val regex = Regex("-?\\d+(?:\\.\\d+)?")
+    val values = regex.findAll(raw).mapNotNull { it.value.toDoubleOrNull() }.toList()
+    if (values.size < 2) return null
+    val a = values[0]
+    val b = values[1]
+    val lat: Double
+    val lng: Double
+    if (kotlin.math.abs(a) > 90 && kotlin.math.abs(b) <= 90) {
+        lat = b; lng = a
+    } else {
+        lat = a; lng = b
+    }
+    return lat to lng
 }

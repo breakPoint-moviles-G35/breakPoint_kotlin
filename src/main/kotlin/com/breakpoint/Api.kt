@@ -65,6 +65,14 @@ data class HostProfileDto(
     val payout_method: String?
 )
 
+data class HostProfileDetailDto(
+    val id: String,
+    val verification_status: String?,
+    val payout_method: String?,
+    val spaces: List<SpaceDto>?,
+    val user: UserDto?
+)
+
 data class SpaceDetailFullDto(
     val id: String,
     val title: String,
@@ -79,6 +87,31 @@ data class SpaceDetailFullDto(
     val rating_avg: Double?,
     val bookings: List<SpaceBookingDto>?,
     val hostProfile: HostProfileDto?
+)
+
+data class CreateSpaceRequest(
+    val hostProfileId: String,
+    val title: String,
+    val subtitle: String?,
+    val geo: String?,
+    val capacity: Int,
+    val amenities: List<String>?,
+    val accessibility: List<String>?,
+    val imageUrl: String?,
+    val rules: String?,
+    val price: Double
+)
+
+data class UpdateSpaceRequest(
+    val title: String? = null,
+    val subtitle: String? = null,
+    val geo: String? = null,
+    val capacity: Int? = null,
+    val amenities: List<String>? = null,
+    val accessibility: List<String>? = null,
+    val imageUrl: String? = null,
+    val rules: String? = null,
+    val price: Double? = null
 )
 
 // Booking
@@ -142,6 +175,20 @@ interface SpaceApi {
 
     @GET("space/recommendations/{userId}")
     suspend fun recommendations(@Path("userId") userId: String): List<SpaceDto>
+
+    @GET("space/by-host/{hostProfileId}")
+    suspend fun spacesByHost(@Path("hostProfileId") hostProfileId: String): List<SpaceDto>
+
+    @POST("space")
+    suspend fun createSpace(@Body body: CreateSpaceRequest): SpaceDto
+
+    @PATCH("space/{id}")
+    suspend fun updateSpace(@Path("id") id: String, @Body body: UpdateSpaceRequest): SpaceDto
+}
+
+interface HostProfileApi {
+    @GET("host-profile/my-profile")
+    suspend fun myProfile(): HostProfileDetailDto
 }
 
 interface BookingApi {
@@ -269,6 +316,8 @@ object ApiProvider {
         private set
     @Volatile var review: ReviewApi = retrofit.create(ReviewApi::class.java)
         private set
+    @Volatile var hostProfile: HostProfileApi = retrofit.create(HostProfileApi::class.java)
+        private set
 
     @Synchronized
     fun updateBaseUrl(url: String) {
@@ -283,6 +332,7 @@ object ApiProvider {
         space = retrofit.create(SpaceApi::class.java)
         booking = retrofit.create(BookingApi::class.java)
         review = retrofit.create(ReviewApi::class.java)
+        hostProfile = retrofit.create(HostProfileApi::class.java)
     }
 
     fun currentBaseUrl(): String = baseUrl
