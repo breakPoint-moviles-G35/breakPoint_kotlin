@@ -519,6 +519,32 @@ class ReviewRepository {
             ApiProvider.review.create(CreateReviewRequest(space_id = spaceId, rating = rating, text = text))
             Result.success(Unit)
         } catch (t: Throwable) {
+            if (t is HttpException) {
+                val code = t.code()
+                val raw = try { t.response()?.errorBody()?.string().orEmpty() } catch (_: Throwable) { "" }
+                val backendMessage = try {
+                    val jsonEl = JsonParser.parseString(raw)
+                    if (jsonEl.isJsonObject) {
+                        val obj = jsonEl.asJsonObject
+                        val msgEl = obj.get("message")
+                        when {
+                            msgEl == null || msgEl.isJsonNull -> raw
+                            msgEl.isJsonPrimitive && msgEl.asJsonPrimitive.isString -> msgEl.asString
+                            msgEl.isJsonArray && msgEl.asJsonArray.size() > 0 -> {
+                                val first = msgEl.asJsonArray[0]
+                                if (first.isJsonPrimitive && first.asJsonPrimitive.isString) first.asString else raw
+                            }
+                            else -> raw
+                        }
+                    } else raw
+                } catch (_: Throwable) { raw }
+                if (code == 403 && backendMessage.contains("already has a review", ignoreCase = true)) {
+                    return@withContext Result.failure(IllegalStateException("Ya calificaste este espacio."))
+                }
+                if (code == 400 && backendMessage.isNotBlank()) {
+                    return@withContext Result.failure(IllegalStateException(backendMessage))
+                }
+            }
             Result.failure(t)
         }
     }
