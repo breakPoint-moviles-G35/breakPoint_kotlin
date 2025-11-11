@@ -69,6 +69,11 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.Instant
+import android.Manifest
+import android.annotation.SuppressLint
+import android.location.Location
+import com.google.android.gms.location.LocationServices
+import kotlin.math.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +88,12 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    // Estado ETA / Llegar a tiempo
+    var etaMinutes by remember { mutableStateOf<Int?>(null) }
+    var etaError by remember { mutableStateOf<String?>(null) }
+    var suggestionTimeLabel by remember { mutableStateOf<String?>(null) } // p.ej. "1:30 PM" o "2:00 PM"
+    var suggestionDateIso by remember { mutableStateOf<String?>(null) }   // yyyy-MM-dd
+    var transportMode by remember { mutableStateOf("walk") } // "walk" | "drive" (futuro toggle)
     val repo = remember { BookingRepository() }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
@@ -133,6 +144,50 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             return@Scaffold
         }
         val totalPrice = s.price * duration
+
+        // Cálculo ETA y sugerencia de primer horario alcanzable (best-effort)
+        LaunchedEffect(s.fullAddress, transportMode) {
+            etaError = null; etaMinutes = null; suggestionTimeLabel = null; suggestionDateIso = null
+            try {
+                val latLng = parseLatLngFromGeo(s.fullAddress)
+                if (latLng == null) {
+                    etaError = "Ubicación del espacio no disponible"
+                    return@LaunchedEffect
+                }
+                val fused = LocationServices.getFusedLocationProviderClient(ctx)
+                @SuppressLint("MissingPermission")
+                fun fetchLastLocation(onReady: (Location?) -> Unit) {
+                    // No forzamos permisos; si no hay permiso, simplemente no habrá ETA
+                    fused.lastLocation
+                        .addOnSuccessListener { loc -> onReady(loc) }
+                        .addOnFailureListener { onReady(null) }
+                }
+                fetchLastLocation { current ->
+                    val userLat = current?.latitude
+                    val userLng = current?.longitude
+                    if (userLat == null || userLng == null) {
+                        etaError = "Activa tu ubicación para calcular el tiempo de llegada"
+                        return@fetchLastLocation
+                    }
+                    val distKm = haversineKm(userLat, userLng, latLng.first, latLng.second)
+                    val speedKmh = if (transportMode == "drive") 28.0 else 4.8 // aprox ciudad vs caminar
+                    val eta = ceil((distKm / max(0.5, speedKmh)) * 60.0).toInt().coerceAtLeast(5)
+                    etaMinutes = eta
+                    val zone = ZoneId.systemDefault()
+                    val now = java.time.ZonedDateTime.now(zone)
+                    val readyTime = now.plusMinutes(eta.toLong())
+                    val rounded = readyTime.withMinute(0).withSecond(0).withNano(0).let { rt ->
+                        if (readyTime.minute > 0) rt.plusHours(1) else rt
+                    }
+                    val timeLabel = rounded.format(DateTimeFormatter.ofPattern("h:00 a", Locale.ENGLISH))
+                    suggestionTimeLabel = timeLabel
+                    suggestionDateIso = rounded.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                }
+            } catch (_: Throwable) {
+                etaError = "No fue posible calcular tu tiempo de llegada"
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -208,6 +263,53 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     selectedTime = selectedTime,
                     onTimeSelected = { selectedTime = it }
                 )
+            }
+
+            // Llegar a tiempo (ETA + sugerencia)
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Llegar a tiempo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(6.dp))
+                        when {
+                            etaError != null -> {
+                                Text(etaError ?: "", color = Color(0xFF374151))
+                            }
+                            etaMinutes != null && suggestionTimeLabel != null -> {
+                                val eta = etaMinutes ?: 0
+                                val sug = suggestionTimeLabel ?: ""
+                                val sugDate = suggestionDateIso ?: selectedDate
+                                val etaPretty = formatEtaMinutes(eta)
+                                Text("Llegada estimada: $etaPretty. Primer horario alcanzable: $sug", color = Color(0xFF374151))
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            // Ajustar fecha si la sugerencia cruza de día
+                                            if (!sugDate.isNullOrBlank()) selectedDate = sugDate
+                                            selectedTime = sug
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) { Text("Usar sugerencia") }
+                                    TextButton(onClick = {
+                                        transportMode = if (transportMode == "walk") "drive" else "walk"
+                                    }) {
+                                        Text(if (transportMode == "walk") "Cambiar a vehículo" else "Cambiar a caminar")
+                                    }
+                                }
+                            }
+                            else -> {
+                                Text("Calculando tiempo de llegada…", color = Color(0xFF374151))
+                            }
+                        }
+                    }
+                }
             }
             
             // Duration Selection
@@ -323,6 +425,20 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                             Toast.makeText(ctx, "Selecciona una hora", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        // Aviso si la hora elegida no es alcanzable
+                        try {
+                            val zone = ZoneId.systemDefault()
+                            val chosenDate = LocalDate.parse(selectedDate, DateTimeFormatter.ISO_LOCAL_DATE)
+                            val chosenTime = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+                            val chosen = LocalDateTime.of(chosenDate, chosenTime).atZone(zone).toInstant()
+                            val minReach = etaMinutes?.let { Instant.now().plusSeconds((it * 60).toLong()) }
+                            if (minReach != null && chosen.isBefore(minReach)) {
+                                loading = false
+                                val sug = suggestionTimeLabel ?: "la siguiente hora disponible"
+                                error = "No alcanzas a llegar a tiempo para esa hora. ¿Quieres ajustar a $sug?"
+                                return@Button
+                            }
+                        } catch (_: Throwable) {}
                         if (duration <= 0) {
                             loading = false
                             Toast.makeText(ctx, "Selecciona una duración válida", Toast.LENGTH_SHORT).show()
@@ -413,6 +529,36 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 text = { Text(success ?: "Tu reserva fue creada exitosamente") }
             )
         }
+    }
+}
+
+private fun parseLatLngFromGeo(raw: String?): Pair<Double, Double>? {
+    if (raw.isNullOrBlank()) return null
+    val regex = Regex("-?\\d+(?:\\.\\d+)?")
+    val numbers = regex.findAll(raw).mapNotNull { it.value.toDoubleOrNull() }.toList()
+    if (numbers.size < 2) return null
+    val a = numbers[0]; val b = numbers[1]
+    val lat: Double; val lng: Double
+    if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+    return lat to lng
+}
+
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val R = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2).pow(2.0) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2.0)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+}
+
+private fun formatEtaMinutes(totalMinutes: Int): String {
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours <= 0 -> "$minutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
     }
 }
 
