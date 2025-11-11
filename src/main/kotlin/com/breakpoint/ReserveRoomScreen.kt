@@ -59,6 +59,7 @@ import android.widget.Toast
 import android.view.Gravity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -97,6 +98,14 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     // Telemetría: días más reservados
     var weekdayHistogram by remember { mutableStateOf<List<Int>?>(null) }
     var weekdayError by remember { mutableStateOf<String?>(null) }
+    // Calificación
+    var canReview by remember { mutableStateOf(false) }
+    var showReviewDialog by remember { mutableStateOf(false) }
+    var reviewRating by remember { mutableStateOf(5) }
+    var reviewText by remember { mutableStateOf("") }
+    var reviewLoading by remember { mutableStateOf(false) }
+    var reviewError by remember { mutableStateOf<String?>(null) }
+    var reviewSuccess by remember { mutableStateOf<String?>(null) }
     val repo = remember { BookingRepository() }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
@@ -147,6 +156,14 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             return@Scaffold
         }
         val totalPrice = s.price * duration
+
+        // Habilitar calificación si el usuario tiene alguna reserva de este espacio
+        LaunchedEffect(s.id) {
+            kotlin.runCatching {
+                val bookings = BookingRepository().listMyBookings()
+                bookings.getOrNull()?.any { it.space?.id == s.id }?.let { canReview = it }
+            }
+        }
 
         // Cargar histograma de días más reservados del espacio
         LaunchedEffect(s.id) {
@@ -394,6 +411,28 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     }
                 }
             }
+
+            // Calificar este espacio
+            if (canReview && reviewSuccess == null) {
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Ya usaste este espacio? Califícalo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Tu opinión ayuda a otros usuarios y a mejorar el servicio.", color = Color(0xFF6B7280))
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = { showReviewDialog = true }) {
+                                Text("Calificar este espacio")
+                            }
+                        }
+                    }
+                }
+            }
             
             // Duration Selection
             item {
@@ -597,6 +636,77 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 },
                 title = { Text("No se pudo crear la reserva") },
                 text = { Text(error ?: "Intenta de nuevo") }
+            )
+        }
+        // Dialogo de calificación
+        if (showReviewDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!reviewLoading) showReviewDialog = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (reviewLoading) return@TextButton
+                            val spaceId = space?.id ?: return@TextButton
+                            reviewLoading = true; reviewError = null
+                            scope.launch {
+                                val res = ReviewRepository().submit(spaceId, reviewRating, reviewText.ifBlank { "Sin comentario" })
+                                reviewLoading = false
+                                res.fold(
+                                    onSuccess = {
+                                        showReviewDialog = false
+                                        reviewSuccess = "¡Gracias por tu calificación!"
+                                    },
+                                    onFailure = { t ->
+                                        reviewError = when {
+                                            (t.message ?: "").contains("already has a review", ignoreCase = true) ->
+                                                "Ya calificaste este espacio."
+                                            else -> t.message ?: "No se pudo enviar tu calificación."
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    ) { Text(if (reviewLoading) "Enviando..." else "Enviar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { if (!reviewLoading) showReviewDialog = false }) { Text("Cancelar") }
+                },
+                title = { Text("Calificar este espacio") },
+                text = {
+                    Column {
+                        Row {
+                            (1..5).forEach { i ->
+                                IconButton(onClick = { reviewRating = i }) {
+                                    val filled = i <= reviewRating
+                                    Icon(
+                                        if (filled) Icons.Default.Star else Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = if (filled) MaterialTheme.colorScheme.primary else Color(0xFFCBD5E1)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = reviewText,
+                            onValueChange = { reviewText = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Comentario (opcional)") }
+                        )
+                        if (reviewError != null) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(reviewError ?: "", color = Color(0xFFB91C1C))
+                        }
+                    }
+                }
+            )
+        }
+        if (reviewSuccess != null) {
+            AlertDialog(
+                onDismissRequest = { reviewSuccess = null },
+                confirmButton = { TextButton(onClick = { reviewSuccess = null }) { Text("OK") } },
+                title = { Text("Gracias") },
+                text = { Text(reviewSuccess ?: "") }
             )
         }
         if (success != null) {
