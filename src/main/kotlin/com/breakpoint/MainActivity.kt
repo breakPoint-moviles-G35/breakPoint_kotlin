@@ -8,16 +8,10 @@ import android.widget.Toast
 import android.view.Gravity
 import android.widget.TextView
 import android.graphics.Color as AndroidColor
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
@@ -103,7 +98,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
-import java.text.NumberFormat
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Map
@@ -122,6 +116,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.platform.LocalContext
 import com.breakpoint.ApiProvider
+import com.breakpoint.HostRepository
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.compose.material.icons.outlined.CloudOff
@@ -138,8 +133,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.breakpoint.SpaceDto
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.maps.android.compose.GoogleMap
@@ -148,6 +141,9 @@ import com.google.maps.android.compose.MarkerInfoWindow
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.abs
+import retrofit2.HttpException
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
@@ -285,6 +281,8 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 @Composable
 fun BreakPointApp() {
     val navController = rememberNavController()
+    var currentUser by remember { mutableStateOf<UserDto?>(null) }
+    val isHostUser = currentUser?.role.equals("Host", ignoreCase = true)
     // 401 handler: limpia token y vuelve al login
     val ctxUnauthorized = LocalContext.current
     val tmUnauthorized = remember { TokenManager(ctxUnauthorized) }
@@ -293,6 +291,7 @@ fun BreakPointApp() {
         scopeUnauthorized.launch {
             tmUnauthorized.clear()
             ApiProvider.setToken(null)
+            currentUser = null
         }
         navController.navigate(Destinations.Login.route) {
             popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
@@ -310,7 +309,11 @@ fun BreakPointApp() {
     Scaffold(
         bottomBar = {
             if (currentRoute != Destinations.Login.route) {
-                BottomNavigationBar(navController)
+                if (isHostUser) {
+                    HostBottomNavigationBar(navController)
+                } else {
+                    BottomNavigationBar(navController)
+                }
             }
         }
     ) { padding ->
@@ -347,8 +350,10 @@ fun BreakPointApp() {
                         // Validar token llamando al backend
                         val repo = AuthRepository()
                         val res = repo.profile()
-                        res.fold(onSuccess = {
-                            navController.navigate(Destinations.Explore.route) {
+                        res.fold(onSuccess = { user ->
+                            currentUser = user
+                            val target = if (user.role.equals("Host", ignoreCase = true)) Destinations.HostExplore.route else Destinations.Explore.route
+                            navController.navigate(target) {
                                 popUpTo(Destinations.Splash.route) { inclusive = true }
                                 launchSingleTop = true
                             }
@@ -363,7 +368,8 @@ fun BreakPointApp() {
                                 }
                             } else {
                                 // Error de red u otro: conservar token y entrar en modo offline
-                                navController.navigate(Destinations.Explore.route) {
+                                val fallbackRoute = if (isHostUser) Destinations.HostExplore.route else Destinations.Explore.route
+                                navController.navigate(fallbackRoute) {
                                     popUpTo(Destinations.Splash.route) { inclusive = true }
                                     launchSingleTop = true
                                 }
@@ -381,8 +387,10 @@ fun BreakPointApp() {
             }
             composable(Destinations.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = {
-                        navController.navigate(Destinations.Explore.route) {
+                    onLoginSuccess = { user ->
+                        currentUser = user
+                        val target = if (user.role.equals("Host", ignoreCase = true)) Destinations.HostExplore.route else Destinations.Explore.route
+                        navController.navigate(target) {
                             popUpTo(Destinations.Login.route) { inclusive = true }
                             launchSingleTop = true
                         }
@@ -393,10 +401,24 @@ fun BreakPointApp() {
                 )
             }
             composable(Destinations.Explore.route) { ExploreScreen(navController) }
+            composable(Destinations.HostExplore.route) { HostExploreScreen(navController) }
+            composable(Destinations.HostMap.route) { HostMapScreen(navController) }
+            composable(Destinations.HostCreateSpace.route) { HostCreateSpaceScreen(navController) }
             composable(Destinations.Map.route) { ExploreScreen(navController, startInMap = true) }
             
             composable(Destinations.Reservations.route) { ReservationsScreen(navController) }
-            composable(Destinations.Profile.route) { ProfileScreen(navController) }
+            composable(Destinations.Profile.route) {
+                ProfileScreen(
+                    navController = navController,
+                    onLogout = { currentUser = null },
+                    initialUser = currentUser
+                )
+            }
+            composable(Destinations.HostProfile.route) {
+                HostProfileScreen(navController = navController, initialUser = currentUser) {
+                    currentUser = null
+                }
+            }
             composable(Destinations.ServerSettings.route) { ServerSettingsScreen(navController) }
             composable(Destinations.Review.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
@@ -423,6 +445,10 @@ sealed class Destinations(val route: String, val label: String) {
     data object Map : Destinations("map", "Mapa")
     data object Reservations : Destinations("reservations", "Reservations")
     data object Profile : Destinations("profile", "Profile")
+    data object HostExplore : Destinations("host/explore", "Explore")
+    data object HostMap : Destinations("host/map", "Mapa")
+    data object HostCreateSpace : Destinations("host/create", "Crear")
+    data object HostProfile : Destinations("host/profile", "Perfil")
     data object Review : Destinations("review/{spaceId}", "Review") {
         fun createRoute(spaceId: String) = "review/$spaceId"
     }
@@ -477,6 +503,10 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.Review -> Icons.Default.Star
                         Destinations.Offline -> Icons.Outlined.CloudOff
                         Destinations.ServerSettings -> Icons.Default.Tune
+                        Destinations.HostExplore -> Icons.Default.Search
+                        Destinations.HostMap -> Icons.Outlined.Map
+                        Destinations.HostCreateSpace -> Icons.Default.Add
+                        Destinations.HostProfile -> Icons.Default.Person
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
@@ -492,7 +522,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {}) {
+fun LoginScreen(onLoginSuccess: (UserDto) -> Unit, onOpenServerSettings: () -> Unit = {}) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isRegister by remember { mutableStateOf(false) }
@@ -548,7 +578,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
     }
 
     fun validateName(name: String): String? {
-        if (name.isNotBlank() && name.trim().isEmpty()) {
+        if (isRegister) {
+            if (name.isBlank()) return "El nombre es obligatorio"
+            if (name.trim().isEmpty()) return "Nombre no puede ser solo espacios"
+        } else if (name.isNotBlank() && name.trim().isEmpty()) {
             return "Nombre no puede ser vacío"
         }
         return null
@@ -688,7 +721,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
                     ),
                     shape = MaterialTheme.shapes.extraLarge,
                     isError = nameError != null,
-                    supportingText = nameError?.let { { Text(it, color = Color.Red) } }
+                    supportingText = {
+                        val helper = nameError ?: if (isRegister) "Ingresa tu nombre tal como aparece en documentos oficiales" else "Opcional"
+                        Text(
+                            text = helper,
+                            color = if (nameError != null) Color.Red else Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -765,7 +805,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
                 ),
                 shape = MaterialTheme.shapes.extraLarge,
                 isError = emailError != null,
-                supportingText = emailError?.let { { Text(it, color = Color.Red) } }
+                supportingText = {
+                    val helper = emailError ?: "Debe finalizar en @uniandes.edu.co"
+                    Text(
+                        text = helper,
+                        color = if (emailError != null) Color.Red else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
             )
         }
 
@@ -827,7 +874,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
                 ),
                 shape = MaterialTheme.shapes.extraLarge,
                 isError = passwordError != null,
-                supportingText = passwordError?.let { { Text(it, color = Color.Red) } }
+                supportingText = {
+                    val helper = passwordError ?: "Mínimo 6 caracteres, sin espacios en blanco"
+                    Text(
+                        text = helper,
+                        color = if (passwordError != null) Color.Red else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
             )
         }
 
@@ -872,20 +926,27 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(confirmRequester),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        disabledContainerColor = Color.White,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        errorContainerColor = Color.White,
-                        errorIndicatorColor = Color.Red
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    isError = confirmError != null,
-                    supportingText = confirmError?.let { { Text(it, color = Color.Red) } }
-                )
-            }
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    errorContainerColor = Color.White,
+                    errorIndicatorColor = Color.Red
+                ),
+                shape = MaterialTheme.shapes.extraLarge,
+                isError = confirmError != null,
+                supportingText = {
+                    val helper = confirmError ?: "Vuelve a escribir la contraseña para confirmarla"
+                    Text(
+                        text = helper,
+                        color = if (confirmError != null) Color.Red else Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+            )
+        }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -909,20 +970,20 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
                         repo.login(username, password)
                     }
                     result.fold(
-                        onSuccess = {
+                        onSuccess = { user ->
                             if (isRegister) {
                                 success = "Usuario creado exitosamente"
                                 val login = repo.login(username, password)
                                 login.fold(
-                                    onSuccess = {
+                                    onSuccess = { loggedInUser ->
                                         ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                                        onLoginSuccess()
+                                        onLoginSuccess(loggedInUser)
                                     },
                                     onFailure = { error = it.message ?: "Error tras registro" }
                                 )
                             } else {
                                 ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
-                                onLoginSuccess()
+                                onLoginSuccess(user)
                             }
                         },
                         onFailure = { 
@@ -961,6 +1022,47 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onOpenServerSettings: () -> Unit = {
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = error!!, color = Color.Red)
         }
+    }
+}
+
+private fun mapAuthError(t: Throwable, isRegister: Boolean): String {
+    val defaultRegister = "No se pudo crear la cuenta. Revisa los datos ingresados."
+    val defaultLogin = "No se pudo iniciar sesión. Intenta de nuevo."
+    val defaultMessage = if (isRegister) defaultRegister else defaultLogin
+    if (t is HttpException) {
+        val backendMessage = extractBackendMessage(t)
+        return when (t.code()) {
+            400 -> backendMessage ?: if (isRegister) "Datos inválidos para el registro." else "Datos de acceso inválidos."
+            401 -> "Email o contraseña incorrectos."
+            403 -> backendMessage ?: "No tienes permisos para esta acción."
+            404 -> backendMessage ?: "Servicio no disponible. Intenta más tarde."
+            409 -> "Este correo ya está registrado."
+            else -> backendMessage ?: defaultMessage
+        }
+    }
+    if (t is IllegalStateException) return t.message ?: defaultMessage
+    return t.message ?: defaultMessage
+}
+
+private fun extractBackendMessage(ex: HttpException): String? {
+    return try {
+        val raw = ex.response()?.errorBody()?.string().orEmpty()
+        if (raw.isBlank()) null else {
+            val json = JSONObject(raw)
+            when (val message = json.opt("message")) {
+                is JSONArray -> {
+                    val items = mutableListOf<String>()
+                    for (i in 0 until message.length()) {
+                        items += message.optString(i)
+                    }
+                    items.joinToString(", ")
+                }
+                is String -> message
+                else -> raw
+            }
+        }
+    } catch (_: Throwable) {
+        null
     }
 }
 
@@ -1249,7 +1351,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         val userIcon = remember(location) { createUserLocationBitmapDescriptor(mapContext) }
                         Marker(
                             state = MarkerState(location),
-                            title = "Tú",
+                            title = "Tu",
                             icon = userIcon,
                             zIndex = 1f
                         )
@@ -1277,7 +1379,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                                     navController.navigate(Destinations.DetailedSpace.createRoute(s.id))
                                 }
                             ) {
-                                MarkerInfoWindowContent(
+                                SpaceMarkerInfoWindowContent(
                                     title = s.title,
                                     subtitle = s.subtitle ?: s.address,
                                     rating = s.rating,
@@ -1312,7 +1414,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                                     navController.navigate(Destinations.DetailedSpace.createRoute(nearest.dto.id))
                                 }
                             ) {
-                                MarkerInfoWindowContent(
+                            SpaceMarkerInfoWindowContent(
                                     title = nearest.dto.title,
                                     subtitle = nearest.dto.subtitle ?: nearest.dto.geo.orEmpty(),
                                     rating = nearest.dto.rating_avg ?: 0.0,
@@ -1719,64 +1821,6 @@ fun OfflineBanner(onRetry: () -> Unit) {
     }
 }
 
-private fun createPriceMarkerBitmapDescriptor(
-    context: Context,
-    price: Int,
-    selected: Boolean
-): BitmapDescriptor {
-    val density = context.resources.displayMetrics.density
-    val horizontalPadding = 12f * density
-    val verticalPadding = 8f * density
-    val cornerRadius = 16f * density
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 14f * density
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        color = if (selected) AndroidColor.WHITE else AndroidColor.parseColor("#5C1B6C")
-    }
-    val priceText = formatPriceLabel(price)
-    val textWidth = textPaint.measureText(priceText)
-    val textHeight = textPaint.fontMetrics.run { descent - ascent }
-    val width = (textWidth + horizontalPadding * 2).toInt().coerceAtLeast((48f * density).toInt())
-    val height = (textHeight + verticalPadding * 2).toInt()
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (selected) AndroidColor.parseColor("#5C1B6C") else AndroidColor.WHITE
-    }
-    val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
-    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, backgroundPaint)
-    val textX = (width - textWidth) / 2f
-    val textY = verticalPadding - textPaint.ascent()
-    canvas.drawText(priceText, textX, textY, textPaint)
-    return BitmapDescriptorFactory.fromBitmap(bitmap)
-}
-
-private fun formatPriceLabel(price: Int): String {
-    return if (price <= 0) {
-        "Gratis"
-    } else {
-        val formatter = NumberFormat.getNumberInstance(Locale.getDefault())
-        "$${formatter.format(price)}"
-    }
-}
-
-private fun createUserLocationBitmapDescriptor(context: Context): BitmapDescriptor {
-    val density = context.resources.displayMetrics.density
-    val size = (16f * density).toInt().coerceAtLeast(12)
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.parseColor("#5C1B6C")
-    }
-    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.WHITE
-    }
-    val center = size / 2f
-    canvas.drawCircle(center, center, center, outerPaint)
-    canvas.drawCircle(center, center, center * 0.55f, innerPaint)
-    return BitmapDescriptorFactory.fromBitmap(bitmap)
-}
-
 @Composable
 private fun HourDropdown(label: String, hour: Int?, onHourSelected: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -1938,6 +1982,57 @@ fun SpaceCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HostBottomNavigationBar(navController: NavHostController) {
+    val items = listOf(
+        Destinations.HostExplore,
+        Destinations.HostMap,
+        Destinations.HostCreateSpace,
+        Destinations.HostProfile
+    )
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val baseIconColor = Color(0xFF5C1B6C)
+    val selectedIndicator = Color(0xFFC6B1C9)
+    val navBarBg = Color(0xFFF6EAF6)
+
+    NavigationBar(
+        containerColor = navBarBg,
+        contentColor = baseIconColor
+    ) {
+        items.forEach { destination ->
+            NavigationBarItem(
+                selected = currentRoute == destination.route,
+                onClick = {
+                    navController.navigate(destination.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = baseIconColor,
+                    selectedTextColor = baseIconColor,
+                    indicatorColor = selectedIndicator,
+                    unselectedIconColor = baseIconColor,
+                    unselectedTextColor = baseIconColor.copy(alpha = 0.85f)
+                ),
+                icon = {
+                    val icon = when (destination) {
+                        Destinations.HostExplore -> Icons.Default.Search
+                        Destinations.HostMap -> Icons.Outlined.Map
+                        Destinations.HostCreateSpace -> Icons.Default.Add
+                        Destinations.HostProfile -> Icons.Default.Person
+                        else -> Icons.Default.Search
+                    }
+                    Icon(imageVector = icon, contentDescription = destination.label)
+                },
+                label = { Text(destination.label) }
+            )
         }
     }
 }
@@ -2370,31 +2465,51 @@ private fun formatBookingTime(b: BookingListItemDto): String {
 }
 
 @Composable
-fun ProfileScreen(navController: NavHostController) {
+fun ProfileScreen(
+    navController: NavHostController,
+    onLogout: () -> Unit = {},
+    roleDescription: String? = null,
+    initialUser: UserDto? = null
+) {
     val repo = remember { AuthRepository() }
-    var email by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("") }
+    val hostRepo = remember { HostRepository() }
+    var email by remember { mutableStateOf(initialUser?.email ?: "") }
+    var name by remember { mutableStateOf(initialUser?.name ?: "") }
+    var role by remember { mutableStateOf(initialUser?.role ?: "") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
+    val isHostProfile = initialUser?.role.equals("Host", true) || roleDescription?.contains("Host", true) == true
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val result = repo.profile()
-        loading = false
         result.fold(
             onSuccess = {
                 email = it.email
                 name = it.name ?: ""
                 role = it.role ?: ""
+                loading = false
             },
-            onFailure = {
-                val offline = !isOnline(ctx)
-                if (offline) {
-                    // Navegar a pantalla sin conexión
-                    navController.navigate(Destinations.Offline.route)
+            onFailure = { throwable ->
+                if (isHostProfile && throwable is HttpException && throwable.code() == 403) {
+                    val hostResult = hostRepo.myProfile()
+                    hostResult.fold(onSuccess = { profile ->
+                        email = profile.user?.email ?: email
+                        name = profile.user?.name ?: name
+                        role = profile.user?.role ?: "Host"
+                        error = null
+                    }, onFailure = {
+                        error = it.message ?: "Error cargando perfil de host"
+                    })
+                    loading = false
                 } else {
-                    error = it.message ?: "Error cargando perfil"
+                    loading = false
+                    val offline = !isOnline(ctx)
+                    error = if (offline) {
+                        "Sin conexión. Algunas acciones pueden no estar disponibles."
+                    } else {
+                        throwable.message ?: "Error cargando perfil"
+                    }
                 }
             }
         )
@@ -2402,8 +2517,6 @@ fun ProfileScreen(navController: NavHostController) {
 
     if (loading) {
         SimpleCenter(text = "Cargando perfil...")
-    } else if (error != null) {
-        SimpleCenter(text = error!!)
     } else {
         Box(
             modifier = Modifier
@@ -2426,15 +2539,26 @@ fun ProfileScreen(navController: NavHostController) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(text = "Mi perfil", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(text = email, style = MaterialTheme.typography.bodyLarge)
-                    if (name.isNotBlank()) {
-                        Text(text = name, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                    Text(text = email.ifBlank { initialUser?.email ?: "Email no disponible" }, style = MaterialTheme.typography.bodyLarge)
+                    Text(text = name.ifBlank { initialUser?.name ?: "Nombre no disponible" }, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                    Text(text = role.ifBlank { initialUser?.role ?: "Rol desconocido" }, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    roleDescription?.let {
+                        Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
-                    if (role.isNotBlank()) {
-                        Text(text = role, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    error?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFD32F2F),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp
+                        )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { /* TODO: cambiar contraseña */ }) {
+                    Button(
+                        onClick = { showTopToast(ctx, "Funcionalidad no disponible sin conexión") },
+                        enabled = error == null
+                    ) {
                         Text("Cambiar contraseña")
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2446,6 +2570,7 @@ fun ProfileScreen(navController: NavHostController) {
                             tokenManager.clear()
                         }
                         ApiProvider.setToken(null)
+                        onLogout()
                         navController.navigate(Destinations.Login.route) {
                             popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                             launchSingleTop = true
@@ -2508,86 +2633,6 @@ private fun demoReservations(): List<ReservationItem> = listOf(
     ReservationItem("Open Space", "2:30 PM", "Cra 7 #85", 4.6),
     ReservationItem("Private Office", "9:00 AM", "Av. 68 #30", 4.9)
 )
-
-@Composable
-private fun MarkerInfoWindowContent(
-    title: String,
-    subtitle: String?,
-    rating: Double,
-    onNavigate: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 12.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .widthIn(min = 180.dp, max = 260.dp)
-            .clickable { onNavigate() }
-    ) {
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFD54F)
-                    )
-                    Text(
-                        text = if (rating > 0) String.format(Locale.getDefault(), "%.1f", rating) else "N/A",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Ver detalles",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun NearestPanel(
@@ -2733,7 +2778,8 @@ private fun parsePriceToInt(price: String?): Int {
 private data class NearestSpaceUi(
     val dto: SpaceDto,
     val latLng: LatLng,
-    val price: Int
+    val price: Int,
+    val bookingCount: Int = 0
 )
 
 

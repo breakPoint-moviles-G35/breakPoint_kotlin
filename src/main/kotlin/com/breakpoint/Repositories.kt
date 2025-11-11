@@ -63,27 +63,6 @@ class SpaceRepository {
         }
     }
 
-    private fun SpaceDto.toSpaceItem(): SpaceItem {
-        val hourlyPrice = try {
-            // Backend expone 'price' como decimal (string). Es precio por hora.
-            (price ?: "0").toDouble().toInt()
-        } catch (_: Throwable) { 0 }
-        val latLng = parseGeoToLatLng(geo)
-        return SpaceItem(
-            id = id,
-            title = title,
-            imageUrl = imageUrl,
-            address = geo.orEmpty(),
-            hour = "",
-            rating = rating_avg ?: 0.0,
-            price = hourlyPrice,
-            subtitle = subtitle,
-            geo = geo,
-            latitude = latLng?.first,
-            longitude = latLng?.second
-        )
-    }
-
     private fun SpaceDto.toNearestItem(): SpaceDto = this
 
     private fun parseGeoToLatLng(raw: String?): Pair<Double, Double>? {
@@ -286,6 +265,85 @@ class SpaceRepository {
                 } catch (_: Throwable) {}
             }
             Result.success(counts.toList())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+}
+
+class HostRepository {
+    suspend fun myProfile(): Result<HostProfileDetailDto> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val profile = ApiProvider.hostProfile.myProfile()
+            Result.success(profile)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun listMySpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val profile = ApiProvider.hostProfile.myProfile()
+            val spacesFromProfile = profile.spaces.orEmpty().map { it.toSpaceItem() }
+            if (spacesFromProfile.isNotEmpty()) {
+                Result.success(spacesFromProfile)
+            } else {
+                val spaces = ApiProvider.space.spacesByHost(profile.id).map { it.toSpaceItem() }
+                Result.success(spaces)
+            }
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    data class CreateSpaceInput(
+        val title: String,
+        val subtitle: String?,
+        val geo: String?,
+        val address: String?,
+        val capacity: Int,
+        val amenities: List<String>,
+        val accessibility: List<String>,
+        val imageUrl: String?,
+        val rules: String?,
+        val price: Double
+    )
+
+    suspend fun createSpace(input: CreateSpaceInput): Result<SpaceItem> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val profile = ApiProvider.hostProfile.myProfile()
+            val body = CreateSpaceRequest(
+                hostProfileId = profile.id,
+                title = input.title,
+                subtitle = input.subtitle,
+                geo = input.geo ?: input.address,
+                capacity = input.capacity,
+                amenities = input.amenities.takeIf { it.isNotEmpty() },
+                accessibility = input.accessibility.takeIf { it.isNotEmpty() },
+                imageUrl = input.imageUrl,
+                rules = input.rules,
+                price = input.price
+            )
+            val created = ApiProvider.space.createSpace(body)
+            Result.success(created.toSpaceItem())
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun updateSpacePrice(spaceId: String, price: Double): Result<Unit> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            ApiProvider.space.updateSpace(spaceId, UpdateSpaceRequest(price = price))
+            Result.success(Unit)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun fetchBookingCount(spaceId: String): Result<Int> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            Result.success(detail.bookings?.size ?: 0)
         } catch (t: Throwable) {
             Result.failure(t)
         }
