@@ -59,6 +59,7 @@ import android.widget.Toast
 import android.view.Gravity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -68,6 +69,12 @@ import java.time.LocalTime
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.Instant
+import android.Manifest
+import android.annotation.SuppressLint
+import android.location.Location
+import com.google.android.gms.location.LocationServices
+import kotlin.math.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +89,23 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    // Estado ETA / Llegar a tiempo
+    var etaMinutes by remember { mutableStateOf<Int?>(null) }
+    var etaError by remember { mutableStateOf<String?>(null) }
+    var suggestionTimeLabel by remember { mutableStateOf<String?>(null) } // p.ej. "1:30 PM" o "2:00 PM"
+    var suggestionDateIso by remember { mutableStateOf<String?>(null) }   // yyyy-MM-dd
+    var transportMode by remember { mutableStateOf("walk") } // "walk" | "drive" (futuro toggle)
+    // Telemetría: días más reservados
+    var weekdayHistogram by remember { mutableStateOf<List<Int>?>(null) }
+    var weekdayError by remember { mutableStateOf<String?>(null) }
+    // Calificación
+    var canReview by remember { mutableStateOf(false) }
+    var showReviewDialog by remember { mutableStateOf(false) }
+    var reviewRating by remember { mutableStateOf(5) }
+    var reviewText by remember { mutableStateOf("") }
+    var reviewLoading by remember { mutableStateOf(false) }
+    var reviewError by remember { mutableStateOf<String?>(null) }
+    var reviewSuccess by remember { mutableStateOf<String?>(null) }
     val repo = remember { BookingRepository() }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
@@ -108,7 +132,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reserve Room") },
+                title = { Text("Reservar espacio") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
@@ -132,6 +156,69 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             return@Scaffold
         }
         val totalPrice = s.price * duration
+
+        // Habilitar calificación si el usuario tiene alguna reserva de este espacio
+        LaunchedEffect(s.id) {
+            kotlin.runCatching {
+                val bookings = BookingRepository().listMyBookings()
+                bookings.getOrNull()?.any { it.space?.id == s.id }?.let { canReview = it }
+            }
+        }
+
+        // Cargar histograma de días más reservados del espacio
+        LaunchedEffect(s.id) {
+            weekdayError = null; weekdayHistogram = null
+            val spaceRepo = SpaceRepository()
+            val res = spaceRepo.getWeekdayHistogram(s.id)
+            res.fold(
+                onSuccess = { weekdayHistogram = it },
+                onFailure = { weekdayError = it.message ?: "No fue posible cargar la telemetría" }
+            )
+        }
+
+        // Cálculo ETA y sugerencia de primer horario alcanzable (best-effort)
+        LaunchedEffect(s.fullAddress, transportMode) {
+            etaError = null; etaMinutes = null; suggestionTimeLabel = null; suggestionDateIso = null
+            try {
+                val latLng = parseLatLngFromGeo(s.fullAddress)
+                if (latLng == null) {
+                    etaError = "Ubicación del espacio no disponible"
+                    return@LaunchedEffect
+                }
+                val fused = LocationServices.getFusedLocationProviderClient(ctx)
+                @SuppressLint("MissingPermission")
+                fun fetchLastLocation(onReady: (Location?) -> Unit) {
+                    // No forzamos permisos; si no hay permiso, simplemente no habrá ETA
+                    fused.lastLocation
+                        .addOnSuccessListener { loc -> onReady(loc) }
+                        .addOnFailureListener { onReady(null) }
+                }
+                fetchLastLocation { current ->
+                    val userLat = current?.latitude
+                    val userLng = current?.longitude
+                    if (userLat == null || userLng == null) {
+                        etaError = "Activa tu ubicación para calcular el tiempo de llegada"
+                        return@fetchLastLocation
+                    }
+                    val distKm = haversineKm(userLat, userLng, latLng.first, latLng.second)
+                    val speedKmh = if (transportMode == "drive") 28.0 else 4.8 // aprox ciudad vs caminar
+                    val eta = ceil((distKm / max(0.5, speedKmh)) * 60.0).toInt().coerceAtLeast(5)
+                    etaMinutes = eta
+                    val zone = ZoneId.systemDefault()
+                    val now = java.time.ZonedDateTime.now(zone)
+                    val readyTime = now.plusMinutes(eta.toLong())
+                    val rounded = readyTime.withMinute(0).withSecond(0).withNano(0).let { rt ->
+                        if (readyTime.minute > 0) rt.plusHours(1) else rt
+                    }
+                    val timeLabel = rounded.format(DateTimeFormatter.ofPattern("h:00 a", Locale.ENGLISH))
+                    suggestionTimeLabel = timeLabel
+                    suggestionDateIso = rounded.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                }
+            } catch (_: Throwable) {
+                etaError = "No fue posible calcular tu tiempo de llegada"
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -183,7 +270,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Select Date",
+                    text = "Selecciona la fecha",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -198,7 +285,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Select Time",
+                    text = "Selecciona la hora",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -208,12 +295,150 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     onTimeSelected = { selectedTime = it }
                 )
             }
+
+            // Llegar a tiempo (ETA + sugerencia)
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Sugerencia para llegar a tiempo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(6.dp))
+                        when {
+                            etaError != null -> {
+                                Text(etaError ?: "", color = Color(0xFF374151))
+                            }
+                            etaMinutes != null && suggestionTimeLabel != null -> {
+                                val eta = etaMinutes ?: 0
+                                val sug = suggestionTimeLabel ?: ""
+                                val sugDate = suggestionDateIso ?: selectedDate
+                                val etaPretty = formatEtaMinutes(eta)
+                                Text("Llegada estimada: $etaPretty. Primer horario alcanzable: $sug", color = Color(0xFF374151))
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            // Ajustar fecha si la sugerencia cruza de día
+                                            if (!sugDate.isNullOrBlank()) selectedDate = sugDate
+                                            selectedTime = sug
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) { Text("Usar sugerencia") }
+                                    TextButton(onClick = {
+                                        transportMode = if (transportMode == "walk") "drive" else "walk"
+                                    }) {
+                                        Text(if (transportMode == "walk") "Cambiar a vehículo" else "Cambiar a caminar")
+                                    }
+                                }
+                            }
+                            else -> {
+                                Text("Calculando tiempo de llegada…", color = Color(0xFF374151))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Días más reservados (semana)
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Días con más reservas esta semana", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        when {
+                            weekdayError != null -> Text(weekdayError ?: "", color = Color(0xFF6B7280))
+                            weekdayHistogram == null -> Text("Cargando...", color = Color(0xFF6B7280))
+                            else -> {
+                                val counts = weekdayHistogram ?: List(7) { 0 }
+                                val labels = listOf("L", "M", "X", "J", "V", "S", "D")
+                                val maxVal = (counts.maxOrNull() ?: 1).coerceAtLeast(1)
+                                // Chips Top 3
+                                val top = counts.mapIndexed { idx, v -> idx to v }
+                                    .sortedByDescending { it.second }
+                                    .take(3).filter { it.second > 0 }
+                                if (top.isNotEmpty()) {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items(top) { (idx, v) ->
+                                            TimeChip(time = "${labels[idx]}: x$v", isSelected = false, onClick = {})
+                                        }
+                                    }
+                                    Spacer(Modifier.height(10.dp))
+                                }
+                                // Barras simples
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(96.dp)
+                                        .padding(bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.Bottom
+                                ) {
+                                    counts.forEachIndexed { i, value ->
+                                        val h = if (maxVal == 0) 0f else (value.toFloat() / maxVal.toFloat())
+                                        val barHeight = max(6f, h * 64f) // altura mínima y tope visual
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(12.dp)
+                                                    .height(barHeight.dp)
+                                                    .background(
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                                        RoundedCornerShape(6.dp)
+                                                    )
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                            Text(labels[i], style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280))
+                                        }
+                                    }
+                                }
+                                // Nota visual
+                                Spacer(Modifier.height(6.dp))
+                                Text("Escala basada en el día con más reservas", style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Calificar este espacio
+            if (canReview && reviewSuccess == null) {
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Ya usaste este espacio? Califícalo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Tu opinión ayuda a otros usuarios y a mejorar el servicio.", color = Color(0xFF6B7280))
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = { showReviewDialog = true }) {
+                                Text("Calificar este espacio")
+                            }
+                        }
+                    }
+                }
+            }
             
             // Duration Selection
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Duration",
+                    text = "Duración",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -228,7 +453,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Number of Guests",
+                    text = "Número de personas",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -256,7 +481,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Price per hour",
+                                text = "Precio por hora",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
@@ -275,7 +500,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "${duration} hour${if (duration > 1) "s" else ""}",
+                                text = "${duration} hora${if (duration > 1) "s" else ""}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
@@ -322,6 +547,20 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                             Toast.makeText(ctx, "Selecciona una hora", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        // Aviso si la hora elegida no es alcanzable
+                        try {
+                            val zone = ZoneId.systemDefault()
+                            val chosenDate = LocalDate.parse(selectedDate, DateTimeFormatter.ISO_LOCAL_DATE)
+                            val chosenTime = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+                            val chosen = LocalDateTime.of(chosenDate, chosenTime).atZone(zone).toInstant()
+                            val minReach = etaMinutes?.let { Instant.now().plusSeconds((it * 60).toLong()) }
+                            if (minReach != null && chosen.isBefore(minReach)) {
+                                loading = false
+                                val sug = suggestionTimeLabel ?: "la siguiente hora disponible"
+                                error = "No alcanzas a llegar a tiempo para esa hora. ¿Quieres ajustar a $sug?"
+                                return@Button
+                            }
+                        } catch (_: Throwable) {}
                         if (duration <= 0) {
                             loading = false
                             Toast.makeText(ctx, "Selecciona una duración válida", Toast.LENGTH_SHORT).show()
@@ -338,8 +577,16 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                                 val time = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
                                 val startLdt = LocalDateTime.of(date, time)
                                 val zone = ZoneId.systemDefault()
-                                val startIso = startLdt.atZone(zone).toInstant().toString()
-                                val endIso = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant().toString()
+                                val startInstant = startLdt.atZone(zone).toInstant()
+                                val endInstant = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant()
+                                // Validación previa: no permitir reservas en el pasado
+                                if (startInstant.isBefore(Instant.now())) {
+                                    loading = false
+                                    error = "La hora de inicio ya pasó. Elige otra hora."
+                                    return@launch
+                                }
+                                val startIso = startInstant.toString()
+                                val endIso = endInstant.toString()
                                 val res = if (bookingId.isNullOrBlank()) {
                                     repo.createBooking(spaceId, startIso, endIso, guestCount)
                                 } else {
@@ -370,7 +617,7 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     enabled = selectedDate.isNotEmpty() && selectedTime.isNotEmpty() && !loading
                 ) {
                     Text(
-                        text = if (loading) "Reservando..." else "Reserve for $${totalPrice}",
+                        text = if (loading) "Reservando..." else "Reservar por $${totalPrice}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -391,6 +638,77 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 text = { Text(error ?: "Intenta de nuevo") }
             )
         }
+        // Dialogo de calificación
+        if (showReviewDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!reviewLoading) showReviewDialog = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (reviewLoading) return@TextButton
+                            val spaceId = space?.id ?: return@TextButton
+                            reviewLoading = true; reviewError = null
+                            scope.launch {
+                                val res = ReviewRepository().submit(spaceId, reviewRating, reviewText.ifBlank { "Sin comentario" })
+                                reviewLoading = false
+                                res.fold(
+                                    onSuccess = {
+                                        showReviewDialog = false
+                                        reviewSuccess = "¡Gracias por tu calificación!"
+                                    },
+                                    onFailure = { t ->
+                                        reviewError = when {
+                                            (t.message ?: "").contains("already has a review", ignoreCase = true) ->
+                                                "Ya calificaste este espacio."
+                                            else -> t.message ?: "No se pudo enviar tu calificación."
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    ) { Text(if (reviewLoading) "Enviando..." else "Enviar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { if (!reviewLoading) showReviewDialog = false }) { Text("Cancelar") }
+                },
+                title = { Text("Calificar este espacio") },
+                text = {
+                    Column {
+                        Row {
+                            (1..5).forEach { i ->
+                                IconButton(onClick = { reviewRating = i }) {
+                                    val filled = i <= reviewRating
+                                    Icon(
+                                        if (filled) Icons.Default.Star else Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = if (filled) MaterialTheme.colorScheme.primary else Color(0xFFCBD5E1)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = reviewText,
+                            onValueChange = { reviewText = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Comentario (opcional)") }
+                        )
+                        if (reviewError != null) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(reviewError ?: "", color = Color(0xFFB91C1C))
+                        }
+                    }
+                }
+            )
+        }
+        if (reviewSuccess != null) {
+            AlertDialog(
+                onDismissRequest = { reviewSuccess = null },
+                confirmButton = { TextButton(onClick = { reviewSuccess = null }) { Text("OK") } },
+                title = { Text("Gracias") },
+                text = { Text(reviewSuccess ?: "") }
+            )
+        }
         if (success != null) {
             AlertDialog(
                 onDismissRequest = { success = null },
@@ -404,6 +722,36 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 text = { Text(success ?: "Tu reserva fue creada exitosamente") }
             )
         }
+    }
+}
+
+private fun parseLatLngFromGeo(raw: String?): Pair<Double, Double>? {
+    if (raw.isNullOrBlank()) return null
+    val regex = Regex("-?\\d+(?:\\.\\d+)?")
+    val numbers = regex.findAll(raw).mapNotNull { it.value.toDoubleOrNull() }.toList()
+    if (numbers.size < 2) return null
+    val a = numbers[0]; val b = numbers[1]
+    val lat: Double; val lng: Double
+    if (abs(a) > 90 && abs(b) <= 90) { lat = b; lng = a } else { lat = a; lng = b }
+    return lat to lng
+}
+
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val R = 6371.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2).pow(2.0) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2.0)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+}
+
+private fun formatEtaMinutes(totalMinutes: Int): String {
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours <= 0 -> "$minutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
     }
 }
 

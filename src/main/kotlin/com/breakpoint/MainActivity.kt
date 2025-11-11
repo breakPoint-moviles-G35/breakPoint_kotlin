@@ -192,30 +192,68 @@ class MainActivity : ComponentActivity() {
                     if (list.isEmpty()) {
                         showTopToast(this@MainActivity, "No tienes una reserva activa ahora")
                     } else {
-                        // Si hay varias, toma la primera por ahora (mejorar: selector en UI)
-                        val booking = list.first()
-                        // Confirmación con diálogo nativo
-                        val dlg = android.app.AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Checkout")
-                            .setMessage("¿Confirmas checkout de ${booking.space?.title ?: "tu reserva"}?")
-                            .setPositiveButton("Confirmar") { _, _ ->
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    val res = repo.checkout(booking.id)
-                                    res.fold(onSuccess = {
-                                        showTopToast(this@MainActivity, "Checkout exitoso")
-                                        // Navegar a pantalla de reseña si se conoce el espacio
-                                        val spaceId = booking.space?.id
-                                        if (!spaceId.isNullOrBlank()) {
-                                            ApiProvider.triggerCheckoutSuccess(spaceId)
-                                        }
-                                    }, onFailure = {
-                                        showTopToast(this@MainActivity, it.message ?: "Error en checkout")
-                                    })
+                        if (list.size == 1) {
+                            val booking = list.first()
+                            val dlg = android.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Checkout")
+                                .setMessage("¿Confirmas checkout de ${booking.space?.title ?: "tu reserva"}?")
+                                .setPositiveButton("Confirmar") { _, _ ->
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        val res = repo.checkout(booking.id)
+                                        res.fold(onSuccess = {
+                                            showTopToast(this@MainActivity, "Checkout exitoso")
+                                            val spaceId = booking.space?.id
+                                            if (!spaceId.isNullOrBlank()) {
+                                                ApiProvider.triggerCheckoutSuccess(spaceId)
+                                            }
+                                        }, onFailure = {
+                                            showTopToast(this@MainActivity, it.message ?: "Error en checkout")
+                                        })
+                                    }
                                 }
+                                .setNegativeButton("Cancelar", null)
+                                .create()
+                            dlg.show()
+                        } else {
+                            // Selección cuando hay múltiples reservas activas
+                            fun fmt(ts: String?): String {
+                                return try {
+                                    java.time.Instant.parse(ts).atZone(java.time.ZoneId.systemDefault())
+                                        .format(java.time.format.DateTimeFormatter.ofPattern("MMM d, h:mm a", java.util.Locale.getDefault()))
+                                } catch (_: Throwable) { ts ?: "" }
                             }
-                            .setNegativeButton("Cancelar", null)
-                            .create()
-                        dlg.show()
+                            val labels = list.map { b ->
+                                val title = b.space?.title ?: "Reserva"
+                                val startLabel = fmt(b.slotStart)
+                                "$title · $startLabel"
+                            }.toTypedArray()
+                            android.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Selecciona la reserva para checkout")
+                                .setItems(labels) { _, which ->
+                                    val booking = list[which]
+                                    android.app.AlertDialog.Builder(this@MainActivity)
+                                        .setTitle("Checkout")
+                                        .setMessage("¿Confirmas checkout de ${booking.space?.title ?: "tu reserva"}?")
+                                        .setPositiveButton("Confirmar") { _, _ ->
+                                            CoroutineScope(Dispatchers.Main).launch {
+                                                val res = repo.checkout(booking.id)
+                                                res.fold(onSuccess = {
+                                                    showTopToast(this@MainActivity, "Checkout exitoso")
+                                                    val spaceId = booking.space?.id
+                                                    if (!spaceId.isNullOrBlank()) {
+                                                        ApiProvider.triggerCheckoutSuccess(spaceId)
+                                                    }
+                                                }, onFailure = {
+                                                    showTopToast(this@MainActivity, it.message ?: "Error en checkout")
+                                                })
+                                            }
+                                        }
+                                        .setNegativeButton("Cancelar", null)
+                                        .show()
+                                }
+                                .setNegativeButton("Cancelar", null)
+                                .show()
+                        }
                     }
                 }, onFailure = {
                     val msg = it.message ?: "Error consultando reserva"
@@ -1277,7 +1315,15 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     profileRes.onSuccess { user ->
                         profileId = user.id
                         val recs = repo.getRecommendations(user.id)
-                        recs.onSuccess { list -> recommendations = list.take(10) }
+                        recs.onSuccess { list ->
+                            recommendations = if (list.isNotEmpty()) list.take(10) else filtered.take(10)
+                        }.onFailure {
+                            // Fallback: usa los primeros espacios ya cargados
+                            recommendations = filtered.take(10)
+                        }
+                    }.onFailure {
+                        // Si no se pudo obtener el perfil, al menos muestra sugeridos por defecto
+                        recommendations = filtered.take(10)
                     }
                 }
             }
