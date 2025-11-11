@@ -68,6 +68,7 @@ import java.time.LocalTime
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -338,8 +339,16 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                                 val time = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
                                 val startLdt = LocalDateTime.of(date, time)
                                 val zone = ZoneId.systemDefault()
-                                val startIso = startLdt.atZone(zone).toInstant().toString()
-                                val endIso = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant().toString()
+                                val startInstant = startLdt.atZone(zone).toInstant()
+                                val endInstant = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant()
+                                // Validación previa: no permitir reservas en el pasado
+                                if (startInstant.isBefore(Instant.now())) {
+                                    loading = false
+                                    error = "La hora de inicio ya pasó. Elige otra hora."
+                                    return@launch
+                                }
+                                val startIso = startInstant.toString()
+                                val endIso = endInstant.toString()
                                 val res = if (bookingId.isNullOrBlank()) {
                                     repo.createBooking(spaceId, startIso, endIso, guestCount)
                                 } else {

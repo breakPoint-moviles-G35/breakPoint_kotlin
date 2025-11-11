@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import kotlin.math.abs
+import com.google.gson.JsonParser
+import com.google.gson.JsonElement
 
 class AuthRepository {
     suspend fun login(email: String, password: String): Result<UserDto> = withContext(Dispatchers.IO) {
@@ -382,18 +384,40 @@ class BookingRepository {
                 val raw = try { t.response()?.errorBody()?.string().orEmpty() } catch (_: Throwable) { "" }
                 val backendMessage = try {
                     // Intentar extraer el campo "message" del JSON de error de NestJS
-                    val jsonStart = raw.indexOf('"')
-                    // Fallback simple si no es JSON estándar
-                    if (raw.contains("\"message\"")) {
-                        val key = "\"message\""
-                        val idx = raw.indexOf(key)
-                        if (idx >= 0) raw.substring(idx + key.length).trim() else raw
+                    val jsonEl: JsonElement = JsonParser.parseString(raw)
+                    if (jsonEl.isJsonObject) {
+                        val obj = jsonEl.asJsonObject
+                        val msgEl = obj.get("message")
+                        when {
+                            msgEl == null || msgEl.isJsonNull -> raw
+                            msgEl.isJsonPrimitive && msgEl.asJsonPrimitive.isString -> msgEl.asString
+                            msgEl.isJsonArray && msgEl.asJsonArray.size() > 0 -> {
+                                val first = msgEl.asJsonArray[0]
+                                if (first.isJsonPrimitive && first.asJsonPrimitive.isString) first.asString else raw
+                            }
+                            else -> raw
+                        }
                     } else raw
                 } catch (_: Throwable) { raw }
 
                 // Horario ocupado: mapear a mensaje en español para la UI
                 if (code == 400 && backendMessage.contains("Time slot not available", ignoreCase = true)) {
                     return@withContext Result.failure(IllegalStateException("Esa hora no está disponible. Por favor selecciona otra."))
+                }
+                // Inicio en el pasado
+                if (code == 400 && (
+                        backendMessage.contains("hora de inicio ya ha pasado", ignoreCase = true) ||
+                        backendMessage.contains("hora de inicio ya pasó", ignoreCase = true) ||
+                        backendMessage.contains("start time has already passed", ignoreCase = true)
+                    )) {
+                    return@withContext Result.failure(IllegalStateException("La hora de inicio ya pasó. Elige otra hora."))
+                }
+                // Fechas inválidas
+                if (code == 400 && (
+                        backendMessage.contains("Invalid dates", ignoreCase = true) ||
+                        backendMessage.contains("slotEnd must be after slotStart", ignoreCase = true)
+                    )) {
+                    return@withContext Result.failure(IllegalStateException("Las fechas seleccionadas no son válidas."))
                 }
             }
             Result.failure(t)
