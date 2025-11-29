@@ -26,6 +26,7 @@ fun RecommendationsBlock(
     navController: NavHostController,
     userId: String,
     modifier: Modifier = Modifier
+    
 ) {
     if (userId.isBlank()) return
 
