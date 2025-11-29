@@ -155,7 +155,13 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(spaceError ?: "No se pudo cargar el espacio") }
             return@Scaffold
         }
-        val totalPrice = s.price * duration
+        // Memoización de zona/formatos y precio total derivado
+        val zone = remember { ZoneId.systemDefault() }
+        val timeFormatter = remember { DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH) }
+        val hourFormatter = remember { DateTimeFormatter.ofPattern("h:00 a", Locale.ENGLISH) }
+        val totalPrice by remember(s.price, duration) {
+            androidx.compose.runtime.derivedStateOf { s.price * duration }
+        }
 
         // Habilitar calificación si el usuario tiene alguna reserva de este espacio
         LaunchedEffect(s.id) {
@@ -204,13 +210,12 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                     val speedKmh = if (transportMode == "drive") 28.0 else 4.8 // aprox ciudad vs caminar
                     val eta = ceil((distKm / max(0.5, speedKmh)) * 60.0).toInt().coerceAtLeast(5)
                     etaMinutes = eta
-                    val zone = ZoneId.systemDefault()
                     val now = java.time.ZonedDateTime.now(zone)
                     val readyTime = now.plusMinutes(eta.toLong())
                     val rounded = readyTime.withMinute(0).withSecond(0).withNano(0).let { rt ->
                         if (readyTime.minute > 0) rt.plusHours(1) else rt
                     }
-                    val timeLabel = rounded.format(DateTimeFormatter.ofPattern("h:00 a", Locale.ENGLISH))
+                    val timeLabel = rounded.format(hourFormatter)
                     suggestionTimeLabel = timeLabel
                     suggestionDateIso = rounded.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
                 }
@@ -358,16 +363,18 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                             weekdayError != null -> Text(weekdayError ?: "", color = Color(0xFF6B7280))
                             weekdayHistogram == null -> Text("Cargando...", color = Color(0xFF6B7280))
                             else -> {
-                                val counts = weekdayHistogram ?: List(7) { 0 }
-                                val labels = listOf("L", "M", "X", "J", "V", "S", "D")
-                                val maxVal = (counts.maxOrNull() ?: 1).coerceAtLeast(1)
-                                // Chips Top 3
-                                val top = counts.mapIndexed { idx, v -> idx to v }
-                                    .sortedByDescending { it.second }
-                                    .take(3).filter { it.second > 0 }
+                                val counts = remember(weekdayHistogram) { weekdayHistogram ?: List(7) { 0 } }
+                                val labels = remember { listOf("L", "M", "X", "J", "V", "S", "D") }
+                                val maxVal = remember(counts) { (counts.maxOrNull() ?: 1).coerceAtLeast(1) }
+                                // Chips Top 3 (memoizados)
+                                val top = remember(counts) {
+                                    counts.mapIndexed { idx, v -> idx to v }
+                                        .sortedByDescending { it.second }
+                                        .take(3).filter { it.second > 0 }
+                                }
                                 if (top.isNotEmpty()) {
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        items(top) { (idx, v) ->
+                                        items(top, key = { it.first }) { (idx, v) ->
                                             TimeChip(time = "${labels[idx]}: x$v", isSelected = false, onClick = {})
                                         }
                                     }
@@ -549,9 +556,8 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                         }
                         // Aviso si la hora elegida no es alcanzable
                         try {
-                            val zone = ZoneId.systemDefault()
                             val chosenDate = LocalDate.parse(selectedDate, DateTimeFormatter.ISO_LOCAL_DATE)
-                            val chosenTime = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+                            val chosenTime = LocalTime.parse(selectedTime, timeFormatter)
                             val chosen = LocalDateTime.of(chosenDate, chosenTime).atZone(zone).toInstant()
                             val minReach = etaMinutes?.let { Instant.now().plusSeconds((it * 60).toLong()) }
                             if (minReach != null && chosen.isBefore(minReach)) {
@@ -574,9 +580,8 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                         scope.launch {
                             try {
                                 val date = LocalDate.parse(selectedDate, DateTimeFormatter.ISO_LOCAL_DATE)
-                                val time = LocalTime.parse(selectedTime, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+                                val time = LocalTime.parse(selectedTime, timeFormatter)
                                 val startLdt = LocalDateTime.of(date, time)
-                                val zone = ZoneId.systemDefault()
                                 val startInstant = startLdt.atZone(zone).toInstant()
                                 val endInstant = startLdt.plusHours(duration.toLong()).atZone(zone).toInstant()
                                 // Validación previa: no permitir reservas en el pasado
@@ -774,7 +779,7 @@ fun DateSelector(selectedDate: String, onDateSelected: (String) -> Unit) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(dates) { (displayDate, fullDate) ->
+        items(dates, key = { it.second }) { (displayDate, fullDate) ->
             DateChip(
                 date = displayDate,
                 isSelected = selectedDate == fullDate,
@@ -814,7 +819,7 @@ fun TimeSelector(selectedTime: String, onTimeSelected: (String) -> Unit) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(timeSlots) { time ->
+        items(timeSlots, key = { it }) { time ->
             TimeChip(
                 time = time,
                 isSelected = selectedTime == time,
