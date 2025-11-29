@@ -153,6 +153,8 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
 import coil.compose.AsyncImage
+import okhttp3.Cache
+import okhttp3.OkHttpClient
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -164,6 +166,37 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 
+object AppImageLoader {
+    fun create(context: Context): ImageLoader {
+        val appContext = context.applicationContext
+        return ImageLoader.Builder(appContext)
+            .crossfade(false)
+            .allowHardware(true)
+            .respectCacheHeaders(true)
+            .memoryCache {
+                MemoryCache.Builder(appContext)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(appContext.cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(256L * 1024 * 1024)
+                    .build()
+            }
+            .okHttpClient(buildHttpClient(appContext))
+            .build()
+    }
+}
+
+fun buildHttpClient(context: Context): OkHttpClient {
+    val cacheSizeBytes = 50L * 1024 * 1024
+    val cacheDir = context.cacheDir.resolve("http_image_cache")
+    return OkHttpClient.Builder()
+        .cache(Cache(cacheDir, cacheSizeBytes))
+        .build()
+}
+
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
     @Volatile private var lastNfcHandledAtMs: Long = 0L
@@ -171,25 +204,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Configuración global de Coil con cachés y hardware bitmaps
-        kotlin.runCatching {
-            val loader = ImageLoader.Builder(this)
-                .crossfade(false)
-                .allowHardware(true)
-                .respectCacheHeaders(true)
-                .memoryCache {
-                    MemoryCache.Builder(this)
-                        .maxSizePercent(0.25)
-                        .build()
-                }
-                .diskCache {
-                    DiskCache.Builder()
-                        .directory(cacheDir.resolve("image_cache"))
-                        .maxSizeBytes(256L * 1024 * 1024)
-                        .build()
-                }
-                .build()
-            Coil.setImageLoader(loader)
-        }
+        kotlin.runCatching { Coil.setImageLoader(AppImageLoader.create(this)) }
         setContent {
             BreakPointTheme { BreakPointApp() }
         }
@@ -2016,12 +2031,12 @@ fun SpaceCard(
                 val context = LocalContext.current
                 val density = LocalDensity.current
                 val screenWidthDp = LocalConfiguration.current.screenWidthDp
-                val wPx = with(density) { screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
-                val hPx = with(density) { imageHeight.roundToPx() }.coerceAtLeast(1)
-                val request = remember(space.imageUrl, wPx, hPx) {
+                val widthPx = with(density) { screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
+                val heightPx = with(density) { imageHeight.roundToPx() }.coerceAtLeast(1)
+                val request = remember(space.imageUrl, widthPx, heightPx) {
                     ImageRequest.Builder(context)
                         .data(space.imageUrl)
-                        .size(wPx, hPx)
+                        .size(widthPx, heightPx)
                         .precision(Precision.EXACT)
                         .scale(Scale.FILL)
                         .crossfade(false)
@@ -2930,5 +2945,6 @@ private data class NearestSpaceUi(
     val price: Int,
     val bookingCount: Int = 0
 )
+
 
 
