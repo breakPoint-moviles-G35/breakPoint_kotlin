@@ -144,6 +144,25 @@ import kotlin.math.abs
 import retrofit2.HttpException
 import org.json.JSONArray
 import org.json.JSONObject
+// Coil (imágenes)
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
+import coil.compose.AsyncImage
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
@@ -151,6 +170,26 @@ class MainActivity : ComponentActivity() {
     private val minNfcIntervalMs: Long = 1500
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Configuración global de Coil con cachés y hardware bitmaps
+        kotlin.runCatching {
+            val loader = ImageLoader.Builder(this)
+                .crossfade(false)
+                .allowHardware(true)
+                .respectCacheHeaders(true)
+                .memoryCache {
+                    MemoryCache.Builder(this)
+                        .maxSizePercent(0.25)
+                        .build()
+                }
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(256L * 1024 * 1024)
+                        .build()
+                }
+                .build()
+            Coil.setImageLoader(loader)
+        }
         setContent {
             BreakPointTheme { BreakPointApp() }
         }
@@ -1626,10 +1665,43 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 }
             }
         } else {
+            // Estado de scroll para claves y prefetch de imágenes
+            val listState = rememberLazyListState()
+            // Prefetch de próximas imágenes según último índice visible
+            val ctx = LocalContext.current
+            val imgLoader = Coil.imageLoader(ctx)
+            // Capturar medidas fuera de efectos/callbacks (no composable dentro de onClick/LaunchedEffect)
+            val configuration = LocalConfiguration.current
+            val density = LocalDensity.current
+            val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
+            val cardImageHeightPx = with(density) { 220.dp.roundToPx() }.coerceAtLeast(1)
+            val heroHeightPx = with(density) { 300.dp.roundToPx() }.coerceAtLeast(1)
+            LaunchedEffect(filtered, listState) {
+                snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                    .filterNotNull()
+                    .distinctUntilChanged()
+                    .collect { lastIndex ->
+                        val indicesToPrefetch = (lastIndex + 1)..(lastIndex + 3)
+                        indicesToPrefetch.forEach { i ->
+                            filtered.getOrNull(i)?.imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                                imgLoader.enqueue(
+                                    ImageRequest.Builder(ctx)
+                                        .data(url)
+                                        .size(screenWidthPx, cardImageHeightPx)
+                                        .precision(Precision.EXACT)
+                                        .scale(Scale.FILL)
+                                        .build()
+                                )
+                            }
+                        }
+                    }
+            }
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
+                ,
+                state = listState
             ) {
                 if (offline) {
                     item {
@@ -1715,10 +1787,25 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         Spacer(Modifier.height(12.dp))
                     }
                 }
-                items(filtered) { space ->
+                items(
+                    items = filtered,
+                    key = { it.id },
+                    contentType = { "space_card" }
+                ) { space ->
                     SpaceCard(
                         space = space.asSpaceDto(),
                         onClick = {
+                            // Preload de imagen principal del detalle antes de navegar
+                            space.imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                                imgLoader.enqueue(
+                                    ImageRequest.Builder(ctx)
+                                        .data(url)
+                                        .size(screenWidthPx, heroHeightPx)
+                                        .precision(Precision.EXACT)
+                                        .scale(Scale.FILL)
+                                        .build()
+                                )
+                            }
                             navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -1925,8 +2012,24 @@ fun SpaceCard(
     ) {
         Column {
             if (!space.imageUrl.isNullOrBlank()) {
+                // Construir una solicitud estable con tamaño exacto para evitar downscale costoso
+                val context = LocalContext.current
+                val density = LocalDensity.current
+                val screenWidthDp = LocalConfiguration.current.screenWidthDp
+                val wPx = with(density) { screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
+                val hPx = with(density) { imageHeight.roundToPx() }.coerceAtLeast(1)
+                val request = remember(space.imageUrl, wPx, hPx) {
+                    ImageRequest.Builder(context)
+                        .data(space.imageUrl)
+                        .size(wPx, hPx)
+                        .precision(Precision.EXACT)
+                        .scale(Scale.FILL)
+                        .crossfade(false)
+                        .allowHardware(true)
+                        .build()
+                }
                 AsyncImage(
-                    model = space.imageUrl,
+                    model = request,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()

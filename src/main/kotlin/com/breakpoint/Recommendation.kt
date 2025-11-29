@@ -59,7 +59,11 @@ fun RecommendationsBlock(
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(recommendations) { space ->
+            items(
+                items = recommendations,
+                key = { it.id },
+                contentType = { "space_card_rec" }
+            ) { space ->
                 SpaceCard(
                     space = space,
                     onClick = {

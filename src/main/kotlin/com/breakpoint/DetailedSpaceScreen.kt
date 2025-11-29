@@ -58,6 +58,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -173,8 +179,24 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                             .height(300.dp)
                     ) {
                         if (heroImage != null) {
+                            // Cargar héroe al tamaño exacto para evitar trabajo extra en GPU
+                            val ctx = LocalContext.current
+                            val density = LocalDensity.current
+                            val widthDp = LocalConfiguration.current.screenWidthDp
+                            val wPx = with(density) { widthDp.dp.roundToPx() }.coerceAtLeast(1)
+                            val hPx = with(density) { 300.dp.roundToPx() }.coerceAtLeast(1)
+                            val req = remember(heroImage, wPx, hPx) {
+                                ImageRequest.Builder(ctx)
+                                    .data(heroImage)
+                                    .size(wPx, hPx)
+                                    .precision(Precision.EXACT)
+                                    .scale(Scale.FILL)
+                                    .crossfade(false)
+                                    .allowHardware(true)
+                                    .build()
+                            }
                             AsyncImage(
-                                model = heroImage,
+                                model = req,
                                 contentDescription = "Imagen principal del espacio",
                                 modifier = Modifier
                                     .fillMaxSize(),
@@ -194,9 +216,23 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(s.images.drop(1)) { imageUrl ->
+                            items(s.images.drop(1), key = { it }, contentType = { "thumb" }) { imageUrl ->
+                                val ctx = LocalContext.current
+                                val density = LocalDensity.current
+                                val wPx = with(density) { 140.dp.roundToPx() }.coerceAtLeast(1)
+                                val hPx = with(density) { 90.dp.roundToPx() }.coerceAtLeast(1)
+                                val req = remember(imageUrl, wPx, hPx) {
+                                    ImageRequest.Builder(ctx)
+                                        .data(imageUrl)
+                                        .size(wPx, hPx)
+                                        .precision(Precision.EXACT)
+                                        .scale(Scale.FILL)
+                                        .crossfade(false)
+                                        .allowHardware(true)
+                                        .build()
+                                }
                                 AsyncImage(
-                                    model = imageUrl,
+                                    model = req,
                                     contentDescription = "Imagen adicional del espacio",
                                     modifier = Modifier
                                         .height(90.dp)
