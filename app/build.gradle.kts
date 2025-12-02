@@ -1,12 +1,13 @@
+// app/build.gradle.kts
+
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
-    id("com.android.application") version "8.5.2"
-    id("org.jetbrains.kotlin.android") version "1.9.24"
-    // Plugin de Google Services (Firebase)
-    id("com.google.gms.google-services") version "4.4.2"
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    // Activa el plugin de Google Services en el módulo app
+    id("com.google.gms.google-services")
 }
-
 
 val localProps = gradleLocalProperties(rootDir, providers)
 
@@ -21,21 +22,18 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Lee MAPS_API_KEY igual que antes, pero mejor desde local.properties también
-        // Provide placeholder so manifest merge does not fail when local key isn't set
         val mapsKey = localProps.getProperty("MAPS_API_KEY")
             ?: System.getenv("MAPS_API_KEY")
             ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
 
-        // Provide backend base URL via local.properties or environment variable, default to localhost
         val backendBaseUrl = localProps.getProperty("BACKEND_BASE_URL")
             ?: System.getenv("BACKEND_BASE_URL")
             ?: "http://localhost:3000/"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
     }
-    
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -107,7 +105,7 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Lifecycle (para lifecycleScope en Activity)
+    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
 
     // DataStore
@@ -115,11 +113,9 @@ dependencies {
 
     // Location services
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    // Coroutines task await (optional convenience)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
     // Google Maps
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:4.3.0")
 }
-
-
