@@ -5,6 +5,8 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.24"
     // Plugin de Google Services (Firebase)
     id("com.google.gms.google-services") version "4.4.2"
+    id("org.jetbrains.kotlin.kapt")
+    id("com.google.dagger.hilt.android") version "2.52"
 }
 
 
@@ -107,8 +109,10 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Lifecycle (para lifecycleScope en Activity)
+    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
@@ -120,6 +124,15 @@ dependencies {
     // Google Maps
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:4.3.0")
+
+    // Hilt DI
+    implementation("com.google.dagger:hilt-android:2.52")
+    kapt("com.google.dagger:hilt-compiler:2.52")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 
