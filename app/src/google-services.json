@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "80379038856",
+    "project_id": "breakpoint-36d6e",
+    "storage_bucket": "breakpoint-36d6e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:80379038856:android:fd5bfc4cd72b1dd777a33d",
+        "android_client_info": {
+          "package_name": "com.breakpoint"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7CnarKqQLVBHGiAlE9pa6G8tP296_JT0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
