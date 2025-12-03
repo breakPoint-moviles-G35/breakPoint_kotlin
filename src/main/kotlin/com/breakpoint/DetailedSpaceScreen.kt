@@ -57,6 +57,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
@@ -74,30 +78,53 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     var isFavorite by remember { mutableStateOf(false) }
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var amenityImpacts by remember { mutableStateOf<List<AmenityImpact>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val accentColor = Color(0xFF5C1B6C)
 
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
         loading = true; error = null
-        val res = repo.getSpace(spaceId)
-        loading = false
-        res.fold(onSuccess = { 
-            space = it
-            // cachear detalle
-            kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
-        }, onFailure = { ex -> 
-            // fallback caché
-            val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
-            if (cached != null) {
-                space = cached
-                error = null
-            } else {
-                error = ex.message ?: "Error cargando espacio"
+        amenityImpacts = emptyList()
+
+        coroutineScope {
+            // Lanzamos en paralelo las tres consultas principales del detalle
+            val spaceDeferred = async(Dispatchers.IO) { repo.getSpace(spaceId) }
+            val popularDeferred = async(Dispatchers.IO) { repo.getPopularHours(spaceId) }
+            val histogramDeferred = async(Dispatchers.IO) { repo.getHourlyHistogram(spaceId) }
+
+            var currentAmenities: Set<String> = emptySet()
+
+            // Esperamos el detalle del espacio y actualizamos UI
+            val res = spaceDeferred.await()
+            loading = false
+            res.fold(onSuccess = {
+                space = it
+                currentAmenities = it.amenities.toSet()
+                kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
+            }, onFailure = { ex ->
+                val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
+                if (cached != null) {
+                    space = cached
+                    currentAmenities = cached.amenities.toSet()
+                    error = null
+                } else {
+                    error = ex.message ?: "Error cargando espacio"
+                }
+            })
+
+            // Estas dos respuestas ya se estaban resolviendo en paralelo
+            popularDeferred.await().onSuccess { popular = it.take(5) }
+            histogramDeferred.await().onSuccess { histogram = it }
+
+            // Analytics de amenities: se calcula en un contexto de I/O y usa varias coroutines en paralelo
+            if (currentAmenities.isNotEmpty()) {
+                val impacts = withContext(Dispatchers.IO) {
+                    computeAmenityImpactsForHost(currentAmenities)
+                }
+                amenityImpacts = impacts
             }
-        })
-        repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
-        repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
+        }
     }
     
     androidx.compose.material3.Scaffold(
@@ -390,8 +417,43 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Amenity insights for hosts (BQ)
+                    if (amenityImpacts.isNotEmpty()) {
+                        Text(
+                            text = "Impacto de los amenities en tus reservas",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Para cada amenity comparamos cuántas reservas, en promedio, tienen tus salas que lo incluyen frente a las que no lo tienen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        amenityImpacts.forEach { impact ->
+                            val diff = impact.rateWith - impact.rateWithout
+                            val hasThisAmenity = s.amenities.contains(impact.name)
+                            Text(
+                                text = buildString {
+                                    append("• ${impact.name}: tus salas CON este amenity tienen en promedio ")
+                                    append("%.2f".format(impact.rateWith))
+                                    append(" reservas por sala; tus salas SIN este amenity tienen ")
+                                    append("%.2f".format(impact.rateWithout))
+                                    append(". Es decir, alrededor de ")
+                                    append(if (diff >= 0) "+" else "")
+                                    append("%.2f".format(diff))
+                                    append(" reservas por sala de diferencia.")
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF374151)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+
                     // Reserve Button
                     Button(
                         onClick = {
@@ -553,3 +615,50 @@ fun ReservationBarChart(data: List<Int>, maxCap: Int = 10) {
 }
 
 // Legacy fallback removed: the screen now consumes backend data via SpaceRepository
+
+// Analytics helper: calcula el impacto de los amenities usando múltiples corrutinas en paralelo (multi-threading en IO)
+private suspend fun computeAmenityImpactsForHost(currentAmenities: Set<String>): List<AmenityImpact> = coroutineScope {
+    val hostRepo = HostRepository()
+    val spacesRes = hostRepo.listMySpaces()
+    val hostSpaces = spacesRes.getOrNull() ?: return@coroutineScope emptyList()
+    if (hostSpaces.isEmpty()) return@coroutineScope emptyList()
+
+    // Lanzar en paralelo el conteo de reservas por espacio
+    val countDeferred = hostSpaces.associate { space ->
+        space.id to async(Dispatchers.IO) {
+            hostRepo.fetchBookingCount(space.id).getOrNull() ?: 0
+        }
+    }
+    val counts = countDeferred.mapValues { it.value.await() }
+    if (counts.values.all { it == 0 }) return@coroutineScope emptyList()
+
+    val totalSpaces = hostSpaces.size
+    val totalBookings = counts.values.sum()
+    val allAmenities = hostSpaces.flatMap { it.amenities.orEmpty() }.toSet()
+
+    allAmenities.mapNotNull { amenity ->
+        // Solo consideramos amenities presentes en este espacio actual
+        if (!currentAmenities.contains(amenity)) return@mapNotNull null
+
+        val withSpaces = hostSpaces.filter { it.amenities?.contains(amenity) == true }
+        val spacesWith = withSpaces.size
+        if (spacesWith == 0 || spacesWith == totalSpaces) return@mapNotNull null
+
+        val bookingsWith = withSpaces.sumOf { counts[it.id] ?: 0 }
+        val spacesWithout = totalSpaces - spacesWith
+        val bookingsWithout = totalBookings - bookingsWith
+
+        val rateWith = if (spacesWith > 0) bookingsWith.toDouble() / spacesWith.toDouble() else 0.0
+        val rateWithout = if (spacesWithout > 0) bookingsWithout.toDouble() / spacesWithout.toDouble() else 0.0
+        val lift = if (rateWithout > 0.0) (rateWith - rateWithout) / rateWithout else 0.0
+
+        AmenityImpact(
+            name = amenity,
+            rateWith = rateWith,
+            rateWithout = rateWithout,
+            lift = lift,
+            spacesWith = spacesWith,
+            spacesWithout = spacesWithout
+        )
+    }.sortedByDescending { it.lift }.take(3)
+}
