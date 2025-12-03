@@ -75,6 +75,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,6 +166,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import androidx.hilt.navigation.compose.hiltViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
 object AppImageLoader {
     fun create(context: Context): ImageLoader {
@@ -197,6 +200,7 @@ fun buildHttpClient(context: Context): OkHttpClient {
         .build()
 }
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     // Debounce de intents NFC para evitar ejecuciones dobles
     @Volatile private var lastNfcHandledAtMs: Long = 0L
@@ -206,7 +210,7 @@ class MainActivity : ComponentActivity() {
         // Configuración global de Coil con cachés y hardware bitmaps
         kotlin.runCatching { Coil.setImageLoader(AppImageLoader.create(this)) }
         setContent {
-            BreakPointTheme { BreakPointApp() }
+            BreakPointTheme { BreakPointAppContent() }
         }
         // Manejar intent al abrir por NFC
         handleNfcIntent(intent)
@@ -371,7 +375,7 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun BreakPointApp() {
+fun BreakPointAppContent() {
     val navController = rememberNavController()
     var currentUser by remember { mutableStateOf<UserDto?>(null) }
     val ctxRole = LocalContext.current
@@ -2650,7 +2654,8 @@ fun ProfileScreen(
     navController: NavHostController,
     onLogout: () -> Unit = {},
     roleDescription: String? = null,
-    initialUser: UserDto? = null
+    initialUser: UserDto? = null,
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val repo = remember { AuthRepository() }
     val hostRepo = remember { HostRepository() }
@@ -2661,6 +2666,9 @@ fun ProfileScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     val isHostProfile = initialUser?.role.equals("Host", true) || roleDescription?.contains("Host", true) == true
+    val featureUsage by viewModel.featureUsage.collectAsState()
+    val loadingUsage by viewModel.loadingUsage.collectAsState()
+    val usageError by viewModel.usageError.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val result = repo.profile()
@@ -2694,6 +2702,10 @@ fun ProfileScreen(
                 }
             }
         )
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadFeatureUsage()
     }
 
     if (loading) {
@@ -2762,6 +2774,69 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { navController.navigate(Destinations.ServerSettings.route) }) {
                         Text("Configurar servidor (IP local)")
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    FeatureUsageSection(
+                        loading = loadingUsage,
+                        error = usageError,
+                        items = featureUsage
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FeatureUsageSection(
+    loading: Boolean,
+    error: String?,
+    items: List<FeatureUsageDto>
+) {
+    Text(
+        text = "Feature usage (Q7)",
+        style = MaterialTheme.typography.titleMedium
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    when {
+        loading -> {
+            CircularProgressIndicator()
+        }
+        error != null -> {
+            Text(
+                text = "Error loading analytics: $error",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        else -> {
+            if (items.isEmpty()) {
+                Text(
+                    text = "No usage data available yet.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = item.featureName.replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = item.uses.toString(),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
