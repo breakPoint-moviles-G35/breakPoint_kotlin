@@ -45,6 +45,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -74,7 +75,9 @@ import androidx.navigation.NavHostController
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.breakpoint.ApiProvider
+import com.breakpoint.AnalyticsRepository
 import com.breakpoint.CacheManager
+import com.breakpoint.totalForecastBookings
 import com.breakpoint.UserDto
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -89,15 +92,19 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
 import com.breakpoint.showTopToast
 
 @Composable
 fun HostExploreScreen(navController: NavHostController) {
     val repo = remember { HostRepository() }
+    val analyticsRepo = remember { AnalyticsRepository(ApiProvider.analytics) }
     var spaces by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var forecastTexts by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var forecastLoading by remember { mutableStateOf(false) }
     var showPriceMenu by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var collapsedInfo by remember { mutableStateOf<SpaceItem?>(null) }
@@ -151,6 +158,22 @@ fun HostExploreScreen(navController: NavHostController) {
                     }
                     jobs.awaitAll()
                 }
+                // Prefetch concurrente de forecasts por espacio para no golpear la red en cada card
+                forecastLoading = true
+                val forecasts = coroutineScope {
+                    list.map { spaceItem ->
+                        async(Dispatchers.IO) {
+                            analyticsRepo.getDemandForecastForSpace(spaceItem.id)
+                                .getOrNull()
+                                ?.let { forecast ->
+                                    val total = forecast.totalForecastBookings()
+                                    spaceItem.id to "Forecast next 7 days: ${"%.1f".format(total)} bookings"
+                                }
+                        }
+                    }.awaitAll().filterNotNull().toMap()
+                }
+                forecastTexts = forecasts
+                forecastLoading = false
             }, onFailure = {
                 if (spaces.isEmpty()) {
                     error = it.message ?: "No se pudieron cargar tus espacios"
@@ -243,12 +266,38 @@ fun HostExploreScreen(navController: NavHostController) {
                     ) {
                         items(filtered, key = { it.id }) { space ->
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                var forecastText by remember { mutableStateOf<String?>(null) }
+                                var forecastLoading by remember { mutableStateOf(false) }
+                                LaunchedEffect(space.id) {
+                                    forecastLoading = true
+                                    val res = analyticsRepo.getDemandForecastForSpace(space.id)
+                                    res.onSuccess { list ->
+                                        val total = list.totalForecastBookings()
+                                        forecastText = "Forecast next 7 days: ${"%.1f".format(total)} bookings"
+                                    }.onFailure {
+                                        forecastText = null
+                                    }
+                                    forecastLoading = false
+                                }
                                 SpaceCard(
                                     space = space,
                                     onClick = { navController.navigate(Destinations.DetailedSpace.createRoute(space.id)) },
                                     showLocation = true,
                                     showDetailsButton = true
                                 )
+                                if (forecastLoading) {
+                                    Text(
+                                        text = "Loading forecast...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else if (forecastText != null) {
+                                    Text(
+                                        text = forecastText!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                                 HostQuickActions(
                                     space = space,
                                     onRefresh = { refreshSpaces() }

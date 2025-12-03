@@ -63,6 +63,43 @@ data class ReservationData(
     val guestCount: Int
 )
 
+data class FeatureUsageDashboard(
+    val extendCount: Int,
+    val shareCount: Int,
+    val reviewsCount: Int,
+    val chatCount: Int
+) {
+    val leastUsedFeature: String
+        get() {
+            val pairs = listOf(
+                "extend" to extendCount,
+                "share" to shareCount,
+                "reviews" to reviewsCount,
+                "chat" to chatCount
+            )
+            return pairs.minByOrNull { it.second }?.first ?: "unknown"
+        }
+
+    val mostUsedFeature: String
+        get() {
+            val pairs = listOf(
+                "extend" to extendCount,
+                "share" to shareCount,
+                "reviews" to reviewsCount,
+                "chat" to chatCount
+            )
+            return pairs.maxByOrNull { it.second }?.first ?: "unknown"
+        }
+}
+
+data class DemandForecastDayDto(
+    val day: String,
+    val forecastBookings: Double
+)
+
+fun List<DemandForecastDayDto>.totalForecastBookings(): Double =
+    this.sumOf { it.forecastBookings }
+
 // --- New Dashboard Data for Multithreading Strategy ---
 data class SpaceDashboard(
     val all: List<SpaceItem>,

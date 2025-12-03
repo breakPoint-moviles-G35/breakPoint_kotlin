@@ -18,6 +18,7 @@ import retrofit2.http.DELETE
 import retrofit2.Response
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import com.breakpoint.AnalyticsApi
 
 // DTOs
 data class LoginRequest(val email: String, val password: String)
@@ -318,6 +319,8 @@ object ApiProvider {
         private set
     @Volatile var hostProfile: HostProfileApi = retrofit.create(HostProfileApi::class.java)
         private set
+    @Volatile var analytics: AnalyticsApi = retrofit.create(AnalyticsApi::class.java)
+        private set
 
     @Synchronized
     fun updateBaseUrl(url: String) {
@@ -333,6 +336,7 @@ object ApiProvider {
         booking = retrofit.create(BookingApi::class.java)
         review = retrofit.create(ReviewApi::class.java)
         hostProfile = retrofit.create(HostProfileApi::class.java)
+        analytics = retrofit.create(AnalyticsApi::class.java)
     }
 
     fun currentBaseUrl(): String = baseUrl
