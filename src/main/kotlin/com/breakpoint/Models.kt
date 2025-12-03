@@ -12,7 +12,7 @@ data class SpaceItem(
     val geo: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val capacity: Int = 0 // Added capacity for filtering
+    val capacity: Int = 0, // Added capacity for filtering
     val amenities: List<String>? = null
 )
 
@@ -107,7 +107,7 @@ fun SpaceDto.toSpaceItem(): SpaceItem {
         geo = geo,
         latitude = latLng?.first,
         longitude = latLng?.second,
-        capacity = capacity
+        capacity = capacity,
         amenities = amenities
     )
 }

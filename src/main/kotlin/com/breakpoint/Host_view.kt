@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -278,6 +279,15 @@ fun HostMapScreen(navController: NavHostController) {
     var selectedIndex by remember { mutableStateOf(0) }
     var selectedMarkerId by remember { mutableStateOf<String?>(null) }
     var collapsedInfo by remember { mutableStateOf<SpaceItem?>(null) }
+    var showInsights by remember { mutableStateOf(true) }
+    // Mostrar el primer popup al abrir el mapa
+    LaunchedEffect(spaces) {
+        if (spaces.isNotEmpty()) {
+            collapsedInfo = null
+            selectedIndex = 0
+            selectedMarkerId = spaces.firstOrNull()?.id
+        }
+    }
     var bookingCounts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var usageInsights by remember { mutableStateOf<HostUsageInsights?>(null) }
     var insightsLoading by remember { mutableStateOf(false) }
@@ -523,7 +533,7 @@ fun HostMapScreen(navController: NavHostController) {
                     Text("Centrar")
                 }
 
-                if (spaces.isNotEmpty()) {
+                if (spaces.isNotEmpty() && showInsights) {
                     HostInsightBanner(
                         stats = usageInsights ?: HostUsageInsights(null, null),
                         loading = insightsLoading,
@@ -532,7 +542,19 @@ fun HostMapScreen(navController: NavHostController) {
                             .padding(horizontal = 16.dp, vertical = 16.dp)
                             .padding(top = 48.dp),
                         onPromote = { focusSpaceOnMap(it) },
-                        onShowDetails = { navController.navigate(Destinations.DetailedSpace.createRoute(it.id)) }
+                        onShowDetails = { navController.navigate(Destinations.DetailedSpace.createRoute(it.id)) },
+                        onClose = { showInsights = false }
+                    )
+                }
+
+                if (!showInsights && spaces.isNotEmpty()) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showInsights = true },
+                        icon = { Icon(Icons.Filled.OpenInNew, contentDescription = "Mostrar insights") },
+                        text = { Text("Mostrar insights") },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 56.dp)
                     )
                 }
 
@@ -663,7 +685,8 @@ private fun HostInsightBanner(
     loading: Boolean,
     modifier: Modifier = Modifier,
     onPromote: (SpaceItem) -> Unit,
-    onShowDetails: (SpaceItem) -> Unit
+    onShowDetails: (SpaceItem) -> Unit,
+    onClose: () -> Unit
 ) {
     if (!loading && stats.mostReserved == null && stats.leastReserved == null) return
     val underused = stats.leastReserved
@@ -681,10 +704,24 @@ private fun HostInsightBanner(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Mapa inteligente",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar insights")
+                }
+            }
             Text(
-                text = "Mapa inteligente",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                text = "Recomendaciones de uso",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp
             )
             if (loading) {
                 Row(
