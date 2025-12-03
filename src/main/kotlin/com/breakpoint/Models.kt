@@ -13,6 +13,7 @@ data class SpaceItem(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capacity: Int = 0 // Added capacity for filtering
+    val amenities: List<String>? = null
 )
 
 data class DetailedSpace(
@@ -32,6 +33,16 @@ data class DetailedSpace(
     val availability: String,
     val capacity: Int,
     val size: String
+)
+
+// Analytics for host: impact of amenities on reservations
+data class AmenityImpact(
+    val name: String,
+    val rateWith: Double,
+    val rateWithout: Double,
+    val lift: Double,
+    val spacesWith: Int,
+    val spacesWithout: Int
 )
 
 data class ReservationItem(
@@ -97,6 +108,7 @@ fun SpaceDto.toSpaceItem(): SpaceItem {
         latitude = latLng?.first,
         longitude = latLng?.second,
         capacity = capacity
+        amenities = amenities
     )
 }
 

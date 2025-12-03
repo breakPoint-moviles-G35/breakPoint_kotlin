@@ -132,6 +132,24 @@ fun HostExploreScreen(navController: NavHostController) {
                 spaces = list
                 applyFilter(list, query)
                 collapsedInfo = null
+
+                // Prefetch concurrente de detalles de los primeros espacios del host para caching offline
+                // Lanzamos varias corrutinas en IO para pedir detalles y guardarlos en CacheManager.
+                coroutineScope {
+                    val spaceRepo = SpaceRepository()
+                    val topSpaces = list.take(5) // limitar para no saturar red/batería
+                    val jobs = topSpaces.map { spaceItem ->
+                        async {
+                            runCatching {
+                                val res = spaceRepo.getSpace(spaceItem.id)
+                                res.getOrNull()?.let { detail ->
+                                    cacheManager.saveDetail(detail)
+                                }
+                            }
+                        }
+                    }
+                    jobs.awaitAll()
+                }
             }, onFailure = {
                 if (spaces.isEmpty()) {
                     error = it.message ?: "No se pudieron cargar tus espacios"
@@ -310,7 +328,10 @@ fun HostMapScreen(navController: NavHostController) {
                 val loc = fetchLocation()
                 loc?.let {
                     userLatLng = it
-                    cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
+                    // Proteger contra CameraUpdateFactory no inicializado
+                    runCatching {
+                        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
+                    }
                 }
             }
         }
@@ -356,7 +377,6 @@ fun HostMapScreen(navController: NavHostController) {
     }
 
     LaunchedEffect(Unit) { reload() }
-    LaunchedEffect(Unit) { centerOnUser() }
 
     LaunchedEffect(selectedIndex) {
         spaces.getOrNull(selectedIndex)?.let { space ->
@@ -386,18 +406,47 @@ fun HostMapScreen(navController: NavHostController) {
                     .toMap()
             }
             bookingCounts = counts
-            usageInsights = if (counts.isEmpty()) {
-                null
-            } else {
-                HostUsageInsights(
-                    mostReserved = counts.maxByOrNull { it.value }?.let { entry ->
-                        idToSpace[entry.key]?.let { HostUsageStat(it, entry.value) }
-                    },
-                    leastReserved = counts.minByOrNull { it.value }?.let { entry ->
-                        idToSpace[entry.key]?.let { HostUsageStat(it, entry.value) }
-                    }
-                )
+            if (counts.isEmpty()) {
+                usageInsights = null
+                return@LaunchedEffect
             }
+
+            val most = counts.maxByOrNull { it.value }?.let { entry ->
+                idToSpace[entry.key]?.let { HostUsageStat(it, entry.value) }
+            }
+            val least = counts.minByOrNull { it.value }?.let { entry ->
+                idToSpace[entry.key]?.let { HostUsageStat(it, entry.value) }
+            }
+
+            // Analítica por amenity: promedio de reservas por espacio con/sin ese amenity
+            val totalSpaces = spaces.size
+            val totalBookings = counts.values.sum()
+            val allAmenities = spaces.flatMap { it.amenities.orEmpty() }.toSet()
+            val amenityImpacts = allAmenities.mapNotNull { amenity ->
+                val withSpaces = spaces.filter { it.amenities?.contains(amenity) == true }
+                val spacesWith = withSpaces.size
+                if (spacesWith == 0 || spacesWith == totalSpaces) return@mapNotNull null
+                val bookingsWith = withSpaces.sumOf { counts[it.id] ?: 0 }
+                val spacesWithout = totalSpaces - spacesWith
+                val bookingsWithout = totalBookings - bookingsWith
+                val rateWith = if (spacesWith > 0) bookingsWith.toDouble() / spacesWith.toDouble() else 0.0
+                val rateWithout = if (spacesWithout > 0) bookingsWithout.toDouble() / spacesWithout.toDouble() else 0.0
+                val lift = if (rateWithout > 0.0) (rateWith - rateWithout) / rateWithout else 0.0
+                AmenityImpact(
+                    name = amenity,
+                    rateWith = rateWith,
+                    rateWithout = rateWithout,
+                    lift = lift,
+                    spacesWith = spacesWith,
+                    spacesWithout = spacesWithout
+                )
+            }.sortedByDescending { it.lift }.take(3)
+
+            usageInsights = HostUsageInsights(
+                mostReserved = most,
+                leastReserved = least,
+                amenityImpacts = amenityImpacts
+            )
         } finally {
             insightsLoading = false
         }
@@ -604,7 +653,8 @@ private data class HostUsageStat(val space: SpaceItem, val bookingCount: Int)
 
 private data class HostUsageInsights(
     val mostReserved: HostUsageStat?,
-    val leastReserved: HostUsageStat?
+    val leastReserved: HostUsageStat?,
+    val amenityImpacts: List<AmenityImpact> = emptyList()
 )
 
 @Composable
@@ -691,11 +741,14 @@ private fun HostInsightBanner(
                             Text("Ver detalles")
                         }
                     }
-                } ?: Text(
-                    text = "Aun no hay suficientes reservas para generar sugerencias.",
-                    color = Color.Gray,
-                    fontSize = 13.sp
-                )
+                }
+                if (underused == null && crowded == null) {
+                    Text(
+                        text = "Aun no hay suficientes reservas para generar sugerencias.",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                }
             }
         }
     }
@@ -1084,7 +1137,7 @@ private fun HostEmptyListCard(onCreate: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("AÃºn no has publicado espacios", fontWeight = FontWeight.Bold)
+            Text("Aún no has publicado espacios", fontWeight = FontWeight.Bold)
             Text(
                 text = "Publica tu primer espacio para comenzar a recibir reservas.",
                 textAlign = TextAlign.Center,
