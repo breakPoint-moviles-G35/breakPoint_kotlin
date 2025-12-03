@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
         // Configuración global de Coil con cachés y hardware bitmaps
         kotlin.runCatching { Coil.setImageLoader(AppImageLoader.create(this)) }
         setContent {
-            BreakPointTheme { BreakPointApp() }
+            BreakPointTheme { BreakPointAppContent() }
         }
         // Manejar intent al abrir por NFC
         handleNfcIntent(intent)
@@ -375,7 +375,7 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun BreakPointApp() {
+fun BreakPointAppContent() {
     val navController = rememberNavController()
     var currentUser by remember { mutableStateOf<UserDto?>(null) }
     val isHostUser = currentUser?.role.equals("Host", ignoreCase = true)

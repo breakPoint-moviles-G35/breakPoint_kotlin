@@ -17,6 +17,7 @@ class CacheManager(private val context: Context) {
     private val KEY_DETAILS = stringPreferencesKey("details_json")
     private val KEY_BOOKINGS = stringPreferencesKey("bookings_json")
     private val KEY_BOOKINGS_PRESENT = booleanPreferencesKey("bookings_cached")
+    private val KEY_HOST_SPACES = stringPreferencesKey("host_spaces_json")
 
     // Lista de espacios (para Explore)
     suspend fun saveSpaces(list: List<SpaceItem>) {
@@ -77,6 +78,21 @@ class CacheManager(private val context: Context) {
     suspend fun hasBookingsCache(): Boolean {
         val prefs = context.cacheDataStore.data.firstOrNull()
         return prefs?.get(KEY_BOOKINGS_PRESENT) == true
+    }
+
+    // Espacios del host (para perfil/gestión)
+    suspend fun saveHostSpaces(list: List<SpaceItem>) {
+        val json = gson.toJson(list)
+        context.cacheDataStore.edit { it[KEY_HOST_SPACES] = json }
+    }
+
+    suspend fun loadHostSpaces(): List<SpaceItem> {
+        val prefs = context.cacheDataStore.data.firstOrNull()
+        val json = prefs?.get(KEY_HOST_SPACES) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<SpaceItem>>() {}.type
+            gson.fromJson<List<SpaceItem>>(json, type) ?: emptyList()
+        } catch (_: Throwable) { emptyList() }
     }
 }
 

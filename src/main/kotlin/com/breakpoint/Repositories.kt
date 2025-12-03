@@ -1,5 +1,6 @@
 package com.breakpoint
 
+import android.content.Context
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -327,18 +328,26 @@ class HostRepository {
         }
     }
 
-    suspend fun listMySpaces(): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+    suspend fun listMySpaces(context: Context? = null): Result<List<SpaceItem>> = withContext(Dispatchers.IO) {
+        val cacheManager = context?.let { CacheManager(it.applicationContext) }
+        val persisted = cacheManager?.loadHostSpaces().orEmpty()
         return@withContext try {
+            // Preferir red de manera optimista; persiste en DataStore para próximas visitas/offline.
             val profile = ApiProvider.hostProfile.myProfile()
             val spacesFromProfile = profile.spaces.orEmpty().map { it.toSpaceItem() }
-            if (spacesFromProfile.isNotEmpty()) {
-                Result.success(spacesFromProfile)
+            val spaces = if (spacesFromProfile.isNotEmpty()) {
+                spacesFromProfile
             } else {
-                val spaces = ApiProvider.space.spacesByHost(profile.id).map { it.toSpaceItem() }
-                Result.success(spaces)
+                ApiProvider.space.spacesByHost(profile.id).map { it.toSpaceItem() }
             }
+            cacheManager?.saveHostSpaces(spaces)
+            Result.success(spaces)
         } catch (t: Throwable) {
-            Result.failure(t)
+            if (persisted.isNotEmpty()) {
+                Result.success(persisted)
+            } else {
+                Result.failure(t)
+            }
         }
     }
 

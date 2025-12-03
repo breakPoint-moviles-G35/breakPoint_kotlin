@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -40,6 +41,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -71,6 +73,7 @@ import androidx.navigation.NavHostController
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.breakpoint.ApiProvider
+import com.breakpoint.CacheManager
 import com.breakpoint.UserDto
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -82,6 +85,9 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import com.breakpoint.showTopToast
 
 @Composable
@@ -93,6 +99,9 @@ fun HostExploreScreen(navController: NavHostController) {
     var error by remember { mutableStateOf<String?>(null) }
     var showPriceMenu by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var collapsedInfo by remember { mutableStateOf<SpaceItem?>(null) }
+    val context = LocalContext.current
+    val cacheManager = remember { CacheManager(context.applicationContext) }
     val scope = rememberCoroutineScope()
 
     fun applyFilter(source: List<SpaceItem>, q: String) {
@@ -105,15 +114,30 @@ fun HostExploreScreen(navController: NavHostController) {
 
     fun refreshSpaces() {
         scope.launch {
-            loading = true; error = null
-            val result = repo.listMySpaces()
-            loading = false
-            result.fold(onSuccess = {
-                spaces = it
-                applyFilter(it, query)
+            val diskCached = cacheManager.loadHostSpaces()
+            val initial = if (diskCached.isNotEmpty()) diskCached else emptyList()
+            if (initial.isNotEmpty()) {
+                // Pintar inmediato desde cache (memoria o DataStore) mientras llega el refresh de red.
+                loading = false
+                error = null
+                spaces = initial
+                applyFilter(initial, query)
+            } else {
+                loading = true
+                error = null
+            }
+
+            val result = repo.listMySpaces(context)
+            result.fold(onSuccess = { list ->
+                spaces = list
+                applyFilter(list, query)
+                collapsedInfo = null
             }, onFailure = {
-                error = it.message ?: "No se pudieron cargar tus espacios"
+                if (spaces.isEmpty()) {
+                    error = it.message ?: "No se pudieron cargar tus espacios"
+                }
             })
+            loading = false
         }
     }
 
@@ -230,10 +254,12 @@ fun HostMapScreen(navController: NavHostController) {
         position = CameraPosition.fromLatLngZoom(defaultLatLng, 12f)
     }
     val context = LocalContext.current
+    val cacheManager = remember { CacheManager(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
     var selectedIndex by remember { mutableStateOf(0) }
     var selectedMarkerId by remember { mutableStateOf<String?>(null) }
+    var collapsedInfo by remember { mutableStateOf<SpaceItem?>(null) }
     var bookingCounts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var usageInsights by remember { mutableStateOf<HostUsageInsights?>(null) }
     var insightsLoading by remember { mutableStateOf(false) }
@@ -292,21 +318,40 @@ fun HostMapScreen(navController: NavHostController) {
 
     fun reload() {
         scope.launch {
-            loading = true; error = null
-            val result = repo.listMySpaces()
-            loading = false
-            result.fold(onSuccess = {
-                spaces = it
+            val diskCached = try { cacheManager.loadHostSpaces() } catch (_: Throwable) { emptyList() }
+            if (diskCached.isNotEmpty()) {
+                loading = false
+                error = null
+                spaces = diskCached
                 bookingCounts = emptyMap()
                 usageInsights = null
                 selectedIndex = 0
-                selectedMarkerId = it.firstOrNull()?.id
-                it.firstOrNull { item -> item.latLng() != null }?.latLng()?.let { latLng ->
+                selectedMarkerId = diskCached.firstOrNull()?.id
+                collapsedInfo = null
+                diskCached.firstOrNull { item -> item.latLng() != null }?.latLng()?.let { latLng ->
+                    cameraPositionState.position = CameraPosition.fromLatLngZoom(latLng, 13f)
+                }
+            } else {
+                loading = true
+                error = null
+            }
+            val result = repo.listMySpaces(context)
+            result.fold(onSuccess = { list ->
+                spaces = list
+                bookingCounts = emptyMap()
+                usageInsights = null
+                selectedIndex = 0
+                selectedMarkerId = list.firstOrNull()?.id
+                collapsedInfo = null
+                list.firstOrNull { item -> item.latLng() != null }?.latLng()?.let { latLng ->
                     cameraPositionState.position = CameraPosition.fromLatLngZoom(latLng, 13f)
                 }
             }, onFailure = {
-                error = it.message ?: "No se pudo cargar tus espacios"
+                if (spaces.isEmpty()) {
+                    error = it.message ?: "No se pudo cargar tus espacios"
+                }
             })
+            loading = false
         }
     }
 
@@ -330,12 +375,15 @@ fun HostMapScreen(navController: NavHostController) {
             return@LaunchedEffect
         }
         insightsLoading = true
-        val counts = mutableMapOf<String, Int>()
         val idToSpace = spaces.associateBy { it.id }
         try {
-            for (space in spaces) {
-                val result = repo.fetchBookingCount(space.id)
-                result.getOrNull()?.let { counts[space.id] = it }
+            // Multi-threaded: dispara una petición por espacio en paralelo para llenar las dos ventanas emergentes (stats + info).
+            val counts = coroutineScope {
+                spaces.map { space ->
+                    async { space.id to repo.fetchBookingCount(space.id) }
+                }.awaitAll()
+                    .mapNotNull { (id, result) -> result.getOrNull()?.let { id to it } }
+                    .toMap()
             }
             bookingCounts = counts
             usageInsights = if (counts.isEmpty()) {
@@ -392,6 +440,7 @@ fun HostMapScreen(navController: NavHostController) {
                             onClick = {
                                 selectedIndex = index
                                 selectedMarkerId = space.id
+                                collapsedInfo = null
                                 false
                             }
                         ) {
@@ -401,6 +450,10 @@ fun HostMapScreen(navController: NavHostController) {
                                 rating = space.rating,
                                 onNavigate = {
                                     navController.navigate(Destinations.DetailedSpace.createRoute(space.id))
+                                },
+                                onClose = {
+                                    collapsedInfo = space
+                                    selectedMarkerId = null
                                 }
                             )
                         }
@@ -431,6 +484,24 @@ fun HostMapScreen(navController: NavHostController) {
                             .padding(top = 48.dp),
                         onPromote = { focusSpaceOnMap(it) },
                         onShowDetails = { navController.navigate(Destinations.DetailedSpace.createRoute(it.id)) }
+                    )
+                }
+
+                collapsedInfo?.let { item ->
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            val idx = spaces.indexOfFirst { it.id == item.id }
+                            if (idx >= 0) {
+                                selectedIndex = idx
+                                selectedMarkerId = item.id
+                            }
+                            collapsedInfo = null
+                        },
+                        icon = { Icon(Icons.Filled.OpenInNew, contentDescription = "Mostrar información") },
+                        text = { Text("Mostrar ${item.title}") },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 16.dp, bottom = 140.dp)
                     )
                 }
 

@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.24"
     // Plugin de Google Services (Firebase)
     id("com.google.gms.google-services") version "4.4.2"
-    id("org.jetbrains.kotlin.kapt")
+    id("org.jetbrains.kotlin.kapt") version "1.9.24"
     id("com.google.dagger.hilt.android") version "2.52"
 }
 
