@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import retrofit2.HttpException
 import kotlin.math.abs
+import java.util.LinkedHashMap
 import com.google.gson.JsonParser
 import com.google.gson.JsonElement
 
@@ -64,6 +65,27 @@ class SpaceRepository {
 
         fun invalidateSpacesCache() {
             spacesCache.evictAll()
+        }
+    }
+
+    /**
+     * LRU cache (process-wide) for space stats detail objects keyed by spaceId.
+     * Uses access-order LinkedHashMap to evict the least recently used entry when max size (20) is exceeded.
+     * Keeps stats hot for repeated visits to the same space without extra network calls.
+     */
+    private object SpaceStatsCache {
+        private const val MAX_ENTRIES = 20
+        private val lru = object : LinkedHashMap<String, SpaceDetailFullDto>(MAX_ENTRIES, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SpaceDetailFullDto>): Boolean =
+                size > MAX_ENTRIES
+        }
+
+        @Synchronized
+        fun get(spaceId: String): SpaceDetailFullDto? = lru[spaceId]
+
+        @Synchronized
+        fun put(spaceId: String, detail: SpaceDetailFullDto) {
+            lru[spaceId] = detail
         }
     }
 
@@ -238,7 +260,10 @@ class SpaceRepository {
     suspend fun getPopularHours(spaceId: String): Result<List<Pair<Int, Int>>> = withContext(Dispatchers.IO) {
         // Returns list of (hourOfDay, count) sorted desc by count
         return@withContext try {
-            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            // Check LRU stats cache first
+            val detail = SpaceStatsCache.get(spaceId) ?: ApiProvider.space.getSpaceDetail(spaceId).also {
+                SpaceStatsCache.put(spaceId, it)
+            }
             val counts = IntArray(24)
             fun parseDate(text: String): java.util.Date? {
                 val patterns = listOf(
@@ -277,7 +302,10 @@ class SpaceRepository {
 
     suspend fun getHourlyHistogram(spaceId: String): Result<List<Int>> = withContext(Dispatchers.IO) {
         return@withContext try {
-            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            // Check LRU stats cache first
+            val detail = SpaceStatsCache.get(spaceId) ?: ApiProvider.space.getSpaceDetail(spaceId).also {
+                SpaceStatsCache.put(spaceId, it)
+            }
             val counts = IntArray(24)
             fun parseDate(text: String): java.util.Date? {
                 val patterns = listOf(
@@ -315,7 +343,9 @@ class SpaceRepository {
 
     suspend fun getWeekdayHistogram(spaceId: String): Result<List<Int>> = withContext(Dispatchers.IO) {
         return@withContext try {
-            val detail = ApiProvider.space.getSpaceDetail(spaceId)
+            val detail = SpaceStatsCache.get(spaceId) ?: ApiProvider.space.getSpaceDetail(spaceId).also {
+                SpaceStatsCache.put(spaceId, it)
+            }
             // Orden Lunes..Domingo
             val counts = IntArray(7)
             fun parseDate(text: String): java.util.Date? {

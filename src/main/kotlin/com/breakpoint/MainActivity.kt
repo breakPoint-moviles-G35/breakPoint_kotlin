@@ -102,6 +102,7 @@ import java.util.Locale
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -545,6 +546,7 @@ fun BreakPointAppContent() {
                 }
             }
             composable(Destinations.ServerSettings.route) { ServerSettingsScreen(navController) }
+            composable(Destinations.FeatureUsage.route) { LeastUsedFeaturesScreen() }
             composable(Destinations.Review.route) { backStackEntry ->
                 val spaceId = backStackEntry.arguments?.getString("spaceId") ?: ""
                 ReviewScreen(spaceId = spaceId, navController = navController)
@@ -574,6 +576,7 @@ sealed class Destinations(val route: String, val label: String) {
     data object HostMap : Destinations("host/map", "Mapa")
     data object HostCreateSpace : Destinations("host/create", "Crear")
     data object HostProfile : Destinations("host/profile", "Perfil")
+    data object FeatureUsage : Destinations("feature-usage", "Uso features")
     data object Review : Destinations("review/{spaceId}", "Review") {
         fun createRoute(spaceId: String) = "review/$spaceId"
     }
@@ -632,6 +635,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                         Destinations.HostMap -> Icons.Outlined.Map
                         Destinations.HostCreateSpace -> Icons.Default.Add
                         Destinations.HostProfile -> Icons.Default.Person
+                        Destinations.FeatureUsage -> Icons.Outlined.Leaderboard
                         Destinations.DetailedSpace,
                         Destinations.ReserveRoom,
                         Destinations.Login,
