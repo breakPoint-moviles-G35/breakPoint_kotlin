@@ -244,7 +244,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // Durante el flujo NFC, no navegues automáticamente por 401
                 ApiProvider.setSuppressUnauthorizedNav(true)
-                val repo = BookingRepository()
+                val repo = BookingRepository(this@MainActivity)
                 val active = repo.findActiveNow()
                 active.fold(onSuccess = { list ->
                     if (list.isEmpty()) {
@@ -417,6 +417,22 @@ fun BreakPointAppContent() {
         val context = LocalContext.current
         val tokenManager = remember { TokenManager(context) }
         val serverCfg = remember { ServerConfigManager(context) }
+
+        // Sync Manager: Monitor connectivity and sync pending bookings
+        val bookingRepo = remember { BookingRepository(context) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            while(true) {
+                delay(10_000) // Check every 10 seconds (simple polling for demo)
+                // En una app real usaríamos WorkManager o un ConnectivityManager callback
+                if (ApiProvider.currentToken() != null) {
+                    val count = bookingRepo.syncPendingBookings()
+                    if (count > 0) {
+                       // Opcional: Notificar al usuario que se sincronizaron reservas
+                    }
+                }
+            }
+        }
+        
         androidx.compose.runtime.LaunchedEffect(Unit) {
             tokenManager.tokenFlow.collect { token ->
                 if (!token.isNullOrBlank()) {
@@ -1172,6 +1188,11 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     val authRepo = remember { AuthRepository() }
     var items by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var filtered by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
+    
+    // Sprint 4: Dashboard Categories
+    var dashboardData by remember { mutableStateOf<SpaceDashboard?>(null) }
+    var activeCategory by remember { mutableStateOf("Todos") } // "Todos", "Top", "Budget", "Groups"
+
     var recommendations by remember { mutableStateOf<List<SpaceItem>>(emptyList()) }
     var profileId by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -1190,6 +1211,23 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
     var currentNearestIndex by remember { mutableStateOf(0) }
     var nearestLoading by remember { mutableStateOf(false) }
     val accentColor = Color(0xFF5C1B6C)
+
+    // Filter logic for categories (Defined early to be accessible)
+    fun applyCategory(cat: String) {
+        activeCategory = cat
+        val base = dashboardData ?: return
+        val subset = when(cat) {
+            "Top" -> base.topRated
+            "Budget" -> base.budget
+            "Groups" -> base.bigGroups
+            else -> base.all
+        }
+        // Re-apply search query if needed
+        filtered = if (query.isBlank()) subset else subset.filter { s ->
+            s.title.contains(query, ignoreCase = true) || s.address.contains(query, ignoreCase = true)
+        }
+    }
+
     val parseLatLngString: (String?) -> LatLng? = { text ->
         if (text.isNullOrBlank()) null else {
             val regex = Regex("-?\\d+(?:\\.\\d+)?")
@@ -1319,7 +1357,7 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                     },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    placeholder = { Text("Lorem ipsum?") },
+                    placeholder = { Text("Buscar espacio...") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -1341,29 +1379,72 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                 }
             }
         }
+
+        // Categorías (Sprint 4)
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val cats = listOf("Todos", "Top", "Budget", "Groups")
+            items(cats) { cat ->
+                val isSel = activeCategory == cat
+                val label = when(cat) {
+                    "Top" -> "⭐ Top Rated"
+                    "Budget" -> "\uD83D\uDCB8 Económicos"
+                    "Groups" -> "\uD83D\uDC65 Grupos"
+                    else -> "Todos"
+                }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSel) accentColor else Color.LightGray.copy(alpha = 0.3f),
+                    modifier = Modifier.clickable { applyCategory(cat) }
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        color = if (isSel) Color.White else Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
         val cache = remember(context) { CacheManager(context) }
         fun loadSpaces(forceRefresh: Boolean) {
             coroutineScope.launch {
                 loading = true
                 error = null
                 coroutineScope {
-                    val spacesDef = async { repo.getSpacesSortedByPriceCached(forceRefresh) }
+                    // Sprint 4: Fetch Dashboard instead of just spaces
+                    val dashboardDef = async { repo.getSpaceDashboard(forceRefresh) }
                     val profileDef = async { authRepo.profile() }
-                    val spacesRes = spacesDef.await()
+                    
+                    val dashboardRes = dashboardDef.await()
                     val profileRes = profileDef.await()
+                    
                     loading = false
-                    spacesRes.fold(
-                        onSuccess = {
+                    dashboardRes.fold(
+                        onSuccess = { dash ->
                             offline = false
-                            items = it; filtered = it
-                            cache.saveSpaces(it)
+                            dashboardData = dash
+                            items = dash.all
+                            // Apply initial category filter
+                            filtered = when(activeCategory) {
+                                "Top" -> dash.topRated
+                                "Budget" -> dash.budget
+                                "Groups" -> dash.bigGroups
+                                else -> dash.all
+                            }
+                            cache.saveSpaces(dash.all)
                         },
                         onFailure = { ex ->
                             val cached = cache.loadSpaces()
                             if (cached.isNotEmpty()) {
                                 offline = true
                                 error = null
-                                items = cached; filtered = cached
+                                items = cached
+                                filtered = cached
                             } else {
                                 offline = true
                                 error = ex.message ?: "Sin conexión"
@@ -1376,16 +1457,15 @@ fun ExploreScreen(navController: NavHostController, startInMap: Boolean = false)
                         recs.onSuccess { list ->
                             recommendations = if (list.isNotEmpty()) list.take(10) else filtered.take(10)
                         }.onFailure {
-                            // Fallback: usa los primeros espacios ya cargados
                             recommendations = filtered.take(10)
                         }
                     }.onFailure {
-                        // Si no se pudo obtener el perfil, al menos muestra sugeridos por defecto
                         recommendations = filtered.take(10)
                     }
                 }
             }
         }
+        
         androidx.compose.runtime.LaunchedEffect(Unit) { loadSpaces(false) }
         if (loading) {
             SimpleCenter(text = "Loading...")

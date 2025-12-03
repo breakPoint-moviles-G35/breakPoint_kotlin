@@ -18,6 +18,35 @@ class CacheManager(private val context: Context) {
     private val KEY_BOOKINGS = stringPreferencesKey("bookings_json")
     private val KEY_BOOKINGS_PRESENT = booleanPreferencesKey("bookings_cached")
     private val KEY_HOST_SPACES = stringPreferencesKey("host_spaces_json")
+    private val KEY_PENDING_BOOKINGS = stringPreferencesKey("pending_bookings_json")
+
+    // --- Offline Bookings (Eventual Connectivity) ---
+    suspend fun savePendingBooking(request: CreateBookingRequest) {
+        val list = loadPendingBookings().toMutableList()
+        list.add(request)
+        val json = gson.toJson(list)
+        context.cacheDataStore.edit { it[KEY_PENDING_BOOKINGS] = json }
+    }
+
+    suspend fun loadPendingBookings(): List<CreateBookingRequest> {
+        val prefs = context.cacheDataStore.data.firstOrNull()
+        val json = prefs?.get(KEY_PENDING_BOOKINGS) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<CreateBookingRequest>>() {}.type
+            gson.fromJson<List<CreateBookingRequest>>(json, type) ?: emptyList()
+        } catch (_: Throwable) { emptyList() }
+    }
+
+    suspend fun removePendingBooking(request: CreateBookingRequest) {
+        val list = loadPendingBookings().toMutableList()
+        val initialSize = list.size
+        // Remove matching request (by value equality)
+        list.removeAll { it == request }
+        if (list.size != initialSize) {
+            val json = gson.toJson(list)
+            context.cacheDataStore.edit { it[KEY_PENDING_BOOKINGS] = json }
+        }
+    }
 
     // Lista de espacios (para Explore)
     suspend fun saveSpaces(list: List<SpaceItem>) {
