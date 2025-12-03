@@ -374,7 +374,15 @@ fun BreakPointTheme(content: @Composable () -> Unit) {
 fun BreakPointApp() {
     val navController = rememberNavController()
     var currentUser by remember { mutableStateOf<UserDto?>(null) }
-    val isHostUser = currentUser?.role.equals("Host", ignoreCase = true)
+    val ctxRole = LocalContext.current
+    val tokenManagerForRole = remember(ctxRole) { TokenManager(ctxRole) }
+    var storedRole by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        tokenManagerForRole.roleFlow.collect { role ->
+            storedRole = role
+        }
+    }
+    val isHostUser = (currentUser?.role ?: storedRole).equals("Host", ignoreCase = true)
     // 401 handler: limpia token y vuelve al login
     val ctxUnauthorized = LocalContext.current
     val tmUnauthorized = remember { TokenManager(ctxUnauthorized) }
@@ -459,8 +467,13 @@ fun BreakPointApp() {
                                     launchSingleTop = true
                                 }
                             } else {
-                                // Error de red u otro: conservar token y entrar en modo offline
-                                val fallbackRoute = if (isHostUser) Destinations.HostExplore.route else Destinations.Explore.route
+                                // Error de red u otro: conservar token y usar rol almacenado para decidir home
+                                val storedRole = (currentUser?.role ?: storedRole)
+                                val fallbackRoute = if (storedRole.equals("Host", ignoreCase = true)) {
+                                    Destinations.HostExplore.route
+                                } else {
+                                    Destinations.Explore.route
+                                }
                                 navController.navigate(fallbackRoute) {
                                     popUpTo(Destinations.Splash.route) { inclusive = true }
                                     launchSingleTop = true
@@ -1068,13 +1081,17 @@ fun LoginScreen(onLoginSuccess: (UserDto) -> Unit, onOpenServerSettings: () -> U
                                 val login = repo.login(username, password)
                                 login.fold(
                                     onSuccess = { loggedInUser ->
-                                        ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                        ApiProvider.currentToken()?.let { token ->
+                                            tokenManager.saveSession(token, loggedInUser.id, loggedInUser.role)
+                                        }
                                         onLoginSuccess(loggedInUser)
                                     },
                                     onFailure = { error = it.message ?: "Error tras registro" }
                                 )
                             } else {
-                                ApiProvider.currentToken()?.let { tokenManager.saveToken(it) }
+                                ApiProvider.currentToken()?.let { token ->
+                                    tokenManager.saveSession(token, user.id, user.role)
+                                }
                                 onLoginSuccess(user)
                             }
                         },

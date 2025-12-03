@@ -74,16 +74,19 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
     var isFavorite by remember { mutableStateOf(false) }
     var popular by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     var histogram by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var amenityImpacts by remember { mutableStateOf<List<AmenityImpact>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val accentColor = Color(0xFF5C1B6C)
 
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
         loading = true; error = null
+        var currentAmenities: Set<String> = emptySet()
         val res = repo.getSpace(spaceId)
         loading = false
         res.fold(onSuccess = { 
             space = it
+            currentAmenities = it.amenities.toSet()
             // cachear detalle
             kotlin.runCatching { CacheManager(navController.context).saveDetail(it) }
         }, onFailure = { ex -> 
@@ -91,6 +94,7 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
             val cached = kotlin.runCatching { CacheManager(navController.context).loadDetail(spaceId) }.getOrNull()
             if (cached != null) {
                 space = cached
+                currentAmenities = cached.amenities.toSet()
                 error = null
             } else {
                 error = ex.message ?: "Error cargando espacio"
@@ -98,6 +102,47 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
         })
         repo.getPopularHours(spaceId).onSuccess { popular = it.take(5) }
         repo.getHourlyHistogram(spaceId).onSuccess { histogram = it }
+
+        // Host-only analytics: impacto de amenities en reservas del portafolio
+        amenityImpacts = emptyList()
+        runCatching {
+            val hostRepo = HostRepository()
+            val spacesRes = hostRepo.listMySpaces()
+            spacesRes.onSuccess { hostSpaces ->
+                if (hostSpaces.isEmpty()) return@onSuccess
+                val counts = mutableMapOf<String, Int>()
+                for (sp in hostSpaces) {
+                    val c = hostRepo.fetchBookingCount(sp.id)
+                    c.getOrNull()?.let { counts[sp.id] = it }
+                }
+                if (counts.isEmpty()) return@onSuccess
+                val totalSpaces = hostSpaces.size
+                val totalBookings = counts.values.sum()
+                val allAmenities = hostSpaces.flatMap { it.amenities.orEmpty() }.toSet()
+                val impacts = allAmenities.mapNotNull { amenity ->
+                    // Solo nos interesan amenities que este espacio tiene
+                    if (!currentAmenities.contains(amenity)) return@mapNotNull null
+                    val withSpaces = hostSpaces.filter { it.amenities?.contains(amenity) == true }
+                    val spacesWith = withSpaces.size
+                    if (spacesWith == 0 || spacesWith == totalSpaces) return@mapNotNull null
+                    val bookingsWith = withSpaces.sumOf { counts[it.id] ?: 0 }
+                    val spacesWithout = totalSpaces - spacesWith
+                    val bookingsWithout = totalBookings - bookingsWith
+                    val rateWith = if (spacesWith > 0) bookingsWith.toDouble() / spacesWith.toDouble() else 0.0
+                    val rateWithout = if (spacesWithout > 0) bookingsWithout.toDouble() / spacesWithout.toDouble() else 0.0
+                    val lift = if (rateWithout > 0.0) (rateWith - rateWithout) / rateWithout else 0.0
+                    AmenityImpact(
+                        name = amenity,
+                        rateWith = rateWith,
+                        rateWithout = rateWithout,
+                        lift = lift,
+                        spacesWith = spacesWith,
+                        spacesWithout = spacesWithout
+                    )
+                }.sortedByDescending { it.lift }.take(3)
+                amenityImpacts = impacts
+            }
+        }
     }
     
     androidx.compose.material3.Scaffold(
@@ -390,8 +435,46 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Amenity insights for hosts (BQ)
+                    if (amenityImpacts.isNotEmpty()) {
+                        Text(
+                            text = "Impacto de los amenities en tus reservas",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Para cada amenity comparamos cuántas reservas, en promedio, tienen tus salas que lo incluyen frente a las que no lo tienen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        amenityImpacts.forEach { impact ->
+                            val diff = impact.rateWith - impact.rateWithout
+                            val hasThisAmenity = s.amenities.contains(impact.name)
+                            Text(
+                                text = buildString {
+                                    append("• ${impact.name}: tus salas CON este amenity tienen en promedio ")
+                                    append("%.2f".format(impact.rateWith))
+                                    append(" reservas por sala; tus salas SIN este amenity tienen ")
+                                    append("%.2f".format(impact.rateWithout))
+                                    append(". Es decir, alrededor de ")
+                                    append(if (diff >= 0) "+" else "")
+                                    append("%.2f".format(diff))
+                                    append(" reservas por sala de diferencia.")
+                                    if (hasThisAmenity) {
+                                        append(" ✅ Este espacio sí tiene este amenity.")
+                                    }
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF374151)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+
                     // Reserve Button
                     Button(
                         onClick = {
