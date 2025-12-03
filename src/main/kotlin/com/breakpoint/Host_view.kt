@@ -132,6 +132,24 @@ fun HostExploreScreen(navController: NavHostController) {
                 spaces = list
                 applyFilter(list, query)
                 collapsedInfo = null
+
+                // Prefetch concurrente de detalles de los primeros espacios del host para caching offline
+                // Lanzamos varias corrutinas en IO para pedir detalles y guardarlos en CacheManager.
+                coroutineScope {
+                    val spaceRepo = SpaceRepository()
+                    val topSpaces = list.take(5) // limitar para no saturar red/batería
+                    val jobs = topSpaces.map { spaceItem ->
+                        async {
+                            runCatching {
+                                val res = spaceRepo.getSpace(spaceItem.id)
+                                res.getOrNull()?.let { detail ->
+                                    cacheManager.saveDetail(detail)
+                                }
+                            }
+                        }
+                    }
+                    jobs.awaitAll()
+                }
             }, onFailure = {
                 if (spaces.isEmpty()) {
                     error = it.message ?: "No se pudieron cargar tus espacios"
