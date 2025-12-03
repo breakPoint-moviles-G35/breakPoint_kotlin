@@ -106,9 +106,9 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
     var reviewLoading by remember { mutableStateOf(false) }
     var reviewError by remember { mutableStateOf<String?>(null) }
     var reviewSuccess by remember { mutableStateOf<String?>(null) }
-    val repo = remember { BookingRepository() }
-    val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+    val repo = remember { BookingRepository(ctx) }
+    val scope = rememberCoroutineScope()
     
     LaunchedEffect(spaceId) {
         val repo = SpaceRepository()
@@ -538,10 +538,13 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = {
+                        // Comentamos el chequeo estricto para permitir Eventual Connectivity
+                        /*
                         if (!isOnline(ctx)) {
                             navController.navigate(Destinations.Offline.route)
                             return@Button
                         }
+                        */
                         error = null
                         loading = true
                         if (selectedDate.isBlank()) {
@@ -592,15 +595,19 @@ fun ReserveRoomScreen(spaceId: String, navController: NavHostController, booking
                                 }
                                 val startIso = startInstant.toString()
                                 val endIso = endInstant.toString()
-                                val res = if (bookingId.isNullOrBlank()) {
+                                    val res = if (bookingId.isNullOrBlank()) {
                                     repo.createBooking(spaceId, startIso, endIso, guestCount)
                                 } else {
                                     repo.updateBooking(bookingId, slotStartIso = startIso, slotEndIso = endIso)
                                 }
                                 loading = false
                                 res.fold(
-                                    onSuccess = {
-                                        success = if (bookingId.isNullOrBlank()) "Tu reserva fue creada exitosamente." else "Tu reserva fue actualizada."
+                                    onSuccess = { dto ->
+                                        if (dto.status == "PENDING_SYNC") {
+                                            success = "Sin conexión. Reserva guardada y se enviará automáticamente."
+                                        } else {
+                                            success = if (bookingId.isNullOrBlank()) "Tu reserva fue creada exitosamente." else "Tu reserva fue actualizada."
+                                        }
                                     },
                                     onFailure = {
                                         error = it.message ?: "Error creando reserva"

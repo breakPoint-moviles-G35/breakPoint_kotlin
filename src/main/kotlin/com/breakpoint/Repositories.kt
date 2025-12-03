@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
 import retrofit2.HttpException
 import kotlin.math.abs
 import com.google.gson.JsonParser
@@ -181,6 +182,45 @@ class SpaceRepository {
                 try { (dto.price ?: "0").toDouble() } catch (_: Throwable) { Double.MAX_VALUE }
             }.map { it.toSpaceItem() }
             Result.success(sorted)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    /**
+     * SPRINT 4: Multithreading Isolate Strategy
+     * Fetches spaces and concurrently processes categorization filters using isolated coroutines.
+     */
+    suspend fun getSpaceDashboard(forceRefresh: Boolean = false): Result<SpaceDashboard> = withContext(Dispatchers.Default) {
+        // 1. Fetch Phase (IO Bound)
+        val rawResult = getSpacesSortedByPriceCached(forceRefresh)
+        if (rawResult.isFailure) return@withContext Result.failure(rawResult.exceptionOrNull()!!)
+        val allSpaces = rawResult.getOrThrow()
+
+        // 2. Processing Phase (CPU Bound) - Multithreading Isolate
+        // We spawn 3 concurrent tasks to categorize the data in parallel
+        return@withContext try {
+            val topRatedTask = async {
+                allSpaces.filter { it.rating >= 4.5 }
+            }
+            val budgetTask = async {
+                allSpaces.filter { it.price > 0 && it.price <= 50000 } // Ejemplo: menos de 50k
+            }
+            val groupTask = async {
+                allSpaces.filter { it.capacity >= 10 }
+            }
+
+            // Await all results
+            val topRated = topRatedTask.await()
+            val budget = budgetTask.await()
+            val groups = groupTask.await()
+
+            Result.success(SpaceDashboard(
+                all = allSpaces,
+                topRated = topRated,
+                budget = budget,
+                bigGroups = groups
+            ))
         } catch (t: Throwable) {
             Result.failure(t)
         }
@@ -405,7 +445,7 @@ class HostRepository {
     }
 }
 
-class BookingRepository {
+class BookingRepository(private val context: Context? = null) {
     suspend fun listMyBookings(): Result<List<BookingListItemDto>> = withContext(Dispatchers.IO) {
         return@withContext try {
             val list = ApiProvider.booking.listMine()
@@ -421,20 +461,42 @@ class BookingRepository {
         slotEndIso: String,
         guestCount: Int
     ): Result<BookingDto> = withContext(Dispatchers.IO) {
+        val request = CreateBookingRequest(
+            spaceId = spaceId,
+            slotStart = slotStartIso,
+            slotEnd = slotEndIso,
+            guestCount = guestCount
+        )
         return@withContext try {
-            val dto = ApiProvider.booking.create(
-                CreateBookingRequest(
-                    spaceId = spaceId,
-                    slotStart = slotStartIso,
-                    slotEnd = slotEndIso,
-                    guestCount = guestCount
-                )
-            )
+            val dto = ApiProvider.booking.create(request)
             Result.success(dto)
         } catch (t: Throwable) {
-            if (t is HttpException) {
-                val code = t.code()
-                val raw = try { t.response()?.errorBody()?.string().orEmpty() } catch (_: Throwable) { "" }
+            // DEBUG: Imprimir error
+            android.util.Log.e("BookingRepo", "Error creating booking. Context is null? ${context == null}", t)
+
+            // Lógica robusta: Si NO es un error HTTP (400, 500, etc), asumimos que es red/conexión
+            val isHttpError = t is HttpException
+            
+            if (!isHttpError) {
+                if (context != null) {
+                    try {
+                        val cache = CacheManager(context)
+                        cache.savePendingBooking(request)
+                        // Retornamos éxito falso
+                        return@withContext Result.success(BookingDto(id = "PENDING-OFFLINE", status = "PENDING_SYNC"))
+                    } catch (e: Exception) {
+                        android.util.Log.e("BookingRepo", "Error saving to cache", e)
+                        return@withContext Result.failure(t)
+                    }
+                } else {
+                    // Context es null, no podemos guardar en caché.
+                    // Intentamos usar el error original
+                    return@withContext Result.failure(t)
+                }
+            } else {
+                val httpEx = t as HttpException
+                val code = httpEx.code()
+                val raw = try { httpEx.response()?.errorBody()?.string().orEmpty() } catch (_: Throwable) { "" }
                 val backendMessage = try {
                     // Intentar extraer el campo "message" del JSON de error de NestJS
                     val jsonEl: JsonElement = JsonParser.parseString(raw)
@@ -474,6 +536,30 @@ class BookingRepository {
                 }
             }
             Result.failure(t)
+        }
+    }
+
+    suspend fun syncPendingBookings(): Int {
+        if (context == null) return 0
+        return withContext(Dispatchers.IO) {
+            val cache = CacheManager(context)
+            val pending = cache.loadPendingBookings()
+            var syncedCount = 0
+            for (req in pending) {
+                try {
+                    ApiProvider.booking.create(req)
+                    // Si tiene éxito, remover de caché
+                    cache.removePendingBooking(req)
+                    syncedCount++
+                } catch (e: Throwable) {
+                    // Si falla por algo que NO es red (ej. 400 Bad Request), remover también para no atascar
+                    // Si es IOException, dejarlo para intentar luego
+                    if (e !is java.io.IOException) {
+                        cache.removePendingBooking(req)
+                    }
+                }
+            }
+            syncedCount
         }
     }
 

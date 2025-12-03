@@ -12,6 +12,7 @@ data class SpaceItem(
     val geo: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val capacity: Int = 0 // Added capacity for filtering
     val amenities: List<String>? = null
 )
 
@@ -62,6 +63,13 @@ data class ReservationData(
     val guestCount: Int
 )
 
+// --- New Dashboard Data for Multithreading Strategy ---
+data class SpaceDashboard(
+    val all: List<SpaceItem>,
+    val topRated: List<SpaceItem>,
+    val budget: List<SpaceItem>,
+    val bigGroups: List<SpaceItem>
+)
 
 fun SpaceItem.asSpaceDto(): SpaceDto {
     val priceText = if (price > 0) price.toString() else null
@@ -71,7 +79,7 @@ fun SpaceItem.asSpaceDto(): SpaceDto {
         imageUrl = imageUrl,
         subtitle = subtitle,
         geo = geo ?: address,
-        capacity = 0,
+        capacity = capacity,
         amenities = null,
         accessibility = null,
         rules = null,
@@ -99,6 +107,7 @@ fun SpaceDto.toSpaceItem(): SpaceItem {
         geo = geo,
         latitude = latLng?.first,
         longitude = latLng?.second,
+        capacity = capacity
         amenities = amenities
     )
 }
