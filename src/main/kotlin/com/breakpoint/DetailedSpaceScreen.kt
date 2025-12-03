@@ -464,9 +464,6 @@ fun DetailedSpaceScreen(spaceId: String, navController: NavHostController) {
                                     append(if (diff >= 0) "+" else "")
                                     append("%.2f".format(diff))
                                     append(" reservas por sala de diferencia.")
-                                    if (hasThisAmenity) {
-                                        append(" ✅ Este espacio sí tiene este amenity.")
-                                    }
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF374151)
